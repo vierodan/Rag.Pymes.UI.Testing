@@ -2,8 +2,10 @@ import apiDefinition from '../../api-definition/RagPymes-v1.json';
 import { apiConfig, hasConfiguredApi } from '../api/apiConfig';
 import { SectionCard } from '../components/shared/SectionCard';
 import postmanCollection from '../data/postmanCollection.json';
+import { ConnectionHealthPanel } from '../features/ragPymesApiDemo/components/ConnectionHealthPanel';
 import { RagPymesApiDemo } from '../features/ragPymesApiDemo/components/RagPymesApiDemo';
 import { buildCatalog } from '../lib/postman';
+import type { ConnectionSummary } from '../types/connection';
 import type { OpenApiDocument } from '../types/openapi';
 import styles from './HomePage.module.css';
 
@@ -57,7 +59,11 @@ const workbenchSteps = [
   'Ejecutar request, revisar payload, estado HTTP y ProblemDetails.',
 ];
 
-export function HomePage() {
+interface HomePageProps {
+  onConnectionChange: (summary: ConnectionSummary) => void;
+}
+
+export function HomePage({ onConnectionChange }: HomePageProps) {
   return (
     <div className={styles.page}>
       <section className={styles.hero}>
@@ -92,6 +98,14 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      <SectionCard
+        eyebrow="Conexion"
+        title="Health checks"
+        description="Configura la API base URL, anade un Bearer token si lo necesitas y valida la disponibilidad del backend."
+      >
+        <ConnectionHealthPanel initialBaseUrl={apiConfig.baseUrl} onConnectionChange={onConnectionChange} />
+      </SectionCard>
 
       <section className={styles.dashboardGrid} id="configuration">
         <SectionCard
