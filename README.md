@@ -23,6 +23,8 @@ npm run preview
 npm test
 ```
 
+The local test frontend runs on `http://localhost:22000`.
+
 The endpoint explorer is generated from `src/data/postmanCollection.json`, copied from the backend Postman collection, and enriched with the formal OpenAPI contract in `api-definition/RagPymes-v1.json`.
 
 For operational testing, refresh procedures, and smoke-test scenarios, use [docs/api-testing.md](docs/api-testing.md).
