@@ -1,0 +1,9 @@
+interface:
+  display_name: "Context7 .NET Rules Apply"
+  short_description: "Audit .NET code against current Context7 docs"
+  default_prompt: "Use $context7-net-rules-apply to audit this repository against current .NET, ASP.NET Core, and EF Core guidance from Context7."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "context7"
+      description: "Context7 MCP server for current library and framework documentation"

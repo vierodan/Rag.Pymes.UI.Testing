@@ -7,7 +7,8 @@ This repository is a React + Vite single-page application for testing the RagPym
 - `src/` for application code.
 - `src/components/` for reusable UI.
 - `src/pages/` or `src/routes/` for views.
-- `src/lib/` for API clients, backend adapters, and shared utilities.
+- `src/api/` for typed RagPymes API clients, DTO contracts, API configuration, and HTTP error handling.
+- `src/lib/` for non-API shared utilities when needed.
 - `src/assets/` for images, icons, and local styles.
 - `src/__tests__/` or colocated `*.test.ts(x)` files.
 - `public/` for files served unchanged by Vite.
