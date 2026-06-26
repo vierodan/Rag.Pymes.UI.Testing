@@ -14,7 +14,7 @@ The SPA now follows a guided demo structure:
 - `src/components/layout/` contains `AppShell`, `Header`, and `MainContent`.
 - `src/components/shared/` contains reusable presentation components such as `SectionCard`.
 - `src/pages/HomePage.tsx` introduces the API testing purpose and routes users into the demo.
-- `src/features/ragPymesApiDemo/` contains the RagPymes testing experience.
+- `src/features/ragPymesApiDemo/` contains the RagPymes testing experience, including guided Access Management and Knowledge flows.
 - `src/features/ragPymesApiDemo/components/EndpointExplorer.tsx` preserves the full Postman/OpenAPI endpoint explorer as the advanced testing tool.
 - `src/styles/globals.css` owns base tokens and global element defaults; component styling should use CSS Modules.
 
@@ -54,13 +54,20 @@ Document uploads should use `ragPymesApi.knowledge.uploadKnowledgeDocument(...)`
 
 ## Shared Demo Variables
 
-The Access Management guided panel keeps editable shared variables so one API response can feed the next request:
+The guided Access Management and Knowledge panels share editable variables so one API response can feed the next request:
 
 - `tenantId`: captured from register/provision tenant, get tenant, list tenants, invitations, or memberships responses.
 - `membershipId`: captured from owner membership, accepted invitation membership, list memberships, or change role responses.
 - `invitationId`: captured from create/list/accept/revoke invitation responses.
 - `invitationToken`: captured from `CreateTenantInvitationResponse.invitationToken` and reused by accept invitation.
+- `knowledgeBaseId`: captured from create/get/list knowledge base responses, document metadata, or upload responses.
+- `documentId`: captured from upload/get/reindex document responses, ingestion runs, or search results.
+- `ingestionRunId`: captured from upload, reindex, get ingestion run, get document latest ingestion run, or list ingestion runs.
 
 These variables are UI state only; they are not persisted. Users can overwrite them manually before running any guided action. Tenant roles are limited to the roles documented in Postman: `TenantOwner`, `TenantAdmin`, and `TenantMember`.
 
 The guided Access Management panel intentionally does not send authenticated actor fields for self-service tenant registration. Postman states that issuer, subject, actor ID, and role for `RegisterTenant` come from the Bearer token, so the form only sends `companyName`, `slug`, and `contactEmail`.
+
+The guided Knowledge panel uses the typed API layer for knowledge bases, document upload, ingestion runs, semantic search, and grounded answers. Uploads go through `ragPymesApi.knowledge.uploadKnowledgeDocument(...)`, which creates `FormData` and lets the browser set multipart boundaries and `Content-Type`.
+
+Search and answer filters are optional JSON objects with string values, for example `{"tipo":"contrato"}`. The UI displays search results, answer citations, and metadata when the API returns them, but it does not write documents, tokens, or prompts to application logs.

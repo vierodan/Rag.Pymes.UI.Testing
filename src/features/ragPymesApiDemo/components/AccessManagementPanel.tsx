@@ -6,6 +6,7 @@ import type {
   ProvisionTenantRequest,
   RegisterTenantRequest,
 } from '../../../api/contracts';
+import type { SharedDemoVariables, UpdateSharedDemoVariables } from '../types/demoVariables';
 import { formatPayload, normalizeApiError, type NormalizedApiError } from './apiResultUtils';
 import styles from './AccessManagementPanel.module.css';
 
@@ -19,20 +20,13 @@ interface ActionMeta {
 }
 
 interface ActionResult {
-  captured: Partial<SharedVariables>;
+  captured: Partial<SharedDemoVariables>;
   error?: NormalizedApiError;
   latencyMs: number;
   meta: ActionMeta;
   payload?: unknown;
   status: number | null;
   state: 'success' | 'error';
-}
-
-interface SharedVariables {
-  invitationId: string;
-  invitationToken: string;
-  membershipId: string;
-  tenantId: string;
 }
 
 const tenantRoles: TenantRole[] = ['TenantOwner', 'TenantAdmin', 'TenantMember'];
@@ -95,13 +89,6 @@ const actions = {
   },
 } satisfies Record<string, ActionMeta>;
 
-const initialVariables: SharedVariables = {
-  invitationId: '',
-  invitationToken: '',
-  membershipId: '',
-  tenantId: '',
-};
-
 const initialRegisterForm = {
   companyName: 'Culebras S.A.',
   contactEmail: 'vierodan@culebras.com',
@@ -123,8 +110,12 @@ const initialMembershipForm = {
   role: 'TenantAdmin' as TenantRole,
 };
 
-export function AccessManagementPanel() {
-  const [variables, setVariables] = useState<SharedVariables>(initialVariables);
+interface AccessManagementPanelProps {
+  updateVariables: UpdateSharedDemoVariables;
+  variables: SharedDemoVariables;
+}
+
+export function AccessManagementPanel({ updateVariables, variables }: AccessManagementPanelProps) {
   const [registerForm, setRegisterForm] = useState(initialRegisterForm);
   const [provisionForm, setProvisionForm] = useState(initialProvisionForm);
   const [invitationForm, setInvitationForm] = useState(initialInvitationForm);
@@ -143,7 +134,7 @@ export function AccessManagementPanel() {
       const status = getLastResponseStatus();
 
       if (Object.keys(captured).length > 0) {
-        setVariables((current) => ({ ...current, ...captured }));
+        updateVariables(captured);
       }
 
       setResult({
@@ -184,22 +175,22 @@ export function AccessManagementPanel() {
         <div className={styles.variableGrid}>
           <TextField
             label="tenantId"
-            onChange={(value) => setVariables((current) => ({ ...current, tenantId: value }))}
+            onChange={(value) => updateVariables({ tenantId: value })}
             value={variables.tenantId}
           />
           <TextField
             label="membershipId"
-            onChange={(value) => setVariables((current) => ({ ...current, membershipId: value }))}
+            onChange={(value) => updateVariables({ membershipId: value })}
             value={variables.membershipId}
           />
           <TextField
             label="invitationId"
-            onChange={(value) => setVariables((current) => ({ ...current, invitationId: value }))}
+            onChange={(value) => updateVariables({ invitationId: value })}
             value={variables.invitationId}
           />
           <TextField
             label="invitationToken"
-            onChange={(value) => setVariables((current) => ({ ...current, invitationToken: value }))}
+            onChange={(value) => updateVariables({ invitationToken: value })}
             value={variables.invitationToken}
           />
         </div>
@@ -594,8 +585,8 @@ function optionalText(value: string) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function captureSharedVariables(payload: unknown): Partial<SharedVariables> {
-  const captured: Partial<SharedVariables> = {};
+function captureSharedVariables(payload: unknown): Partial<SharedDemoVariables> {
+  const captured: Partial<SharedDemoVariables> = {};
   const root = asRecord(payload);
 
   const tenant = asRecord(root?.tenant);
@@ -618,8 +609,8 @@ function captureSharedVariables(payload: unknown): Partial<SharedVariables> {
   return captured;
 }
 
-function assignString<T extends keyof SharedVariables>(
-  target: Partial<SharedVariables>,
+function assignString<T extends keyof SharedDemoVariables>(
+  target: Partial<SharedDemoVariables>,
   key: T,
   value: unknown,
 ) {
