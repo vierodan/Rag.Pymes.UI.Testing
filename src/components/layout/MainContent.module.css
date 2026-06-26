@@ -1,0 +1,6 @@
+.main {
+  display: grid;
+  gap: 1.5rem;
+  margin: 0 auto;
+  max-width: 1680px;
+}
