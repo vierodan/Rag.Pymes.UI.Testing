@@ -51,3 +51,16 @@ const tenants = await ragPymesApi.accessManagement.listMyTenants();
 `src/api/httpClient.ts` handles query params, JSON bodies, `FormData`, optional Bearer tokens, request timeouts, and external `AbortSignal`s. `src/api/apiError.ts` parses `ProblemDetails`; catch `ApiHttpError` to inspect `status`, `problem`, and the original payload.
 
 Document uploads should use `ragPymesApi.knowledge.uploadKnowledgeDocument(...)`; it builds the `FormData` payload expected by OpenAPI. Keep the endpoint explorer available for advanced/manual API testing and for comparing raw Postman examples against the typed layer.
+
+## Shared Demo Variables
+
+The Access Management guided panel keeps editable shared variables so one API response can feed the next request:
+
+- `tenantId`: captured from register/provision tenant, get tenant, list tenants, invitations, or memberships responses.
+- `membershipId`: captured from owner membership, accepted invitation membership, list memberships, or change role responses.
+- `invitationId`: captured from create/list/accept/revoke invitation responses.
+- `invitationToken`: captured from `CreateTenantInvitationResponse.invitationToken` and reused by accept invitation.
+
+These variables are UI state only; they are not persisted. Users can overwrite them manually before running any guided action. Tenant roles are limited to the roles documented in Postman: `TenantOwner`, `TenantAdmin`, and `TenantMember`.
+
+The guided Access Management panel intentionally does not send authenticated actor fields for self-service tenant registration. Postman states that issuer, subject, actor ID, and role for `RegisterTenant` come from the Bearer token, so the form only sends `companyName`, `slug`, and `contactEmail`.

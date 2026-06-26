@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { setApiBaseUrl } from '../../../api/apiConfig';
-import { ApiHttpError } from '../../../api/apiError';
 import { getLastResponseStatus, setAccessTokenGetter } from '../../../api/httpClient';
 import { ragPymesApi } from '../../../api/ragPymesApi';
 import type { ConnectionSummary, ConnectionState } from '../../../types/connection';
+import { formatPayload, normalizeApiError, type NormalizedApiError } from './apiResultUtils';
 import styles from './ConnectionHealthPanel.module.css';
 
 type HealthEndpointId = 'health' | 'live' | 'ready';
@@ -18,18 +18,11 @@ interface HealthEndpoint {
 interface HealthResult {
   checkedAt: string;
   endpoint: string;
-  error?: NormalizedError;
+  error?: NormalizedApiError;
   latencyMs: number;
   payload?: unknown;
   status: number | null;
   state: Exclude<ConnectionState, 'idle' | 'checking'>;
-}
-
-interface NormalizedError {
-  detail?: string;
-  message: string;
-  name: string;
-  problem?: unknown;
 }
 
 interface ConnectionHealthPanelProps {
@@ -132,8 +125,11 @@ export function ConnectionHealthPanel({ initialBaseUrl, onConnectionChange }: Co
       });
     } catch (error) {
       const latencyMs = Math.round(performance.now() - startedAt);
-      const normalizedError = normalizeHealthError(error);
-      const status = error instanceof ApiHttpError ? error.status : null;
+      const normalizedError = normalizeApiError(
+        error,
+        'Comprueba que el backend este arrancado, la URL base y CORS.',
+      );
+      const status = normalizedError.status ?? null;
       const state = normalizedError.name === 'AbortError' ? 'offline' : 'offline';
       setResult({
         checkedAt,
@@ -241,53 +237,4 @@ function getBaseUrlValidationMessage(baseUrl: string) {
   }
 
   return '';
-}
-
-function normalizeHealthError(error: unknown): NormalizedError {
-  if (error instanceof ApiHttpError) {
-    return {
-      detail: error.problem?.detail ?? undefined,
-      message: error.message,
-      name: `HTTP ${error.status}`,
-      problem: error.problem ?? error.payload,
-    };
-  }
-
-  if (error instanceof DOMException && error.name === 'AbortError') {
-    return {
-      message: 'La peticion ha expirado. Revisa que el backend este levantado y responda en tiempo.',
-      name: 'AbortError',
-    };
-  }
-
-  if (error instanceof TypeError) {
-    return {
-      message: 'No se pudo conectar con la API. Comprueba que el backend este arrancado, la URL base y CORS.',
-      name: 'NetworkError',
-    };
-  }
-
-  if (error instanceof Error) {
-    return {
-      message: error.message,
-      name: error.name || 'Error',
-    };
-  }
-
-  return {
-    message: 'Error desconocido al ejecutar el health check.',
-    name: 'UnknownError',
-  };
-}
-
-function formatPayload(value: unknown) {
-  if (value === undefined) {
-    return 'Sin payload todavia.';
-  }
-
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
 }
