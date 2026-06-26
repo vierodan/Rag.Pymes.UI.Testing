@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import apiDefinition from '../../api-definition/RagPymes-v1.json';
 import { apiConfig, hasConfiguredApi } from '../api/apiConfig';
 import { SectionCard } from '../components/shared/SectionCard';
 import postmanCollection from '../data/postmanCollection.json';
 import { AccessManagementPanel } from '../features/ragPymesApiDemo/components/AccessManagementPanel';
 import { ConnectionHealthPanel } from '../features/ragPymesApiDemo/components/ConnectionHealthPanel';
+import { KnowledgePanel } from '../features/ragPymesApiDemo/components/KnowledgePanel';
 import { RagPymesApiDemo } from '../features/ragPymesApiDemo/components/RagPymesApiDemo';
+import { initialSharedDemoVariables, type SharedDemoVariables } from '../features/ragPymesApiDemo/types/demoVariables';
 import { buildCatalog } from '../lib/postman';
 import type { ConnectionSummary } from '../types/connection';
 import type { OpenApiDocument } from '../types/openapi';
@@ -65,6 +68,12 @@ interface HomePageProps {
 }
 
 export function HomePage({ onConnectionChange }: HomePageProps) {
+  const [sharedVariables, setSharedVariables] = useState<SharedDemoVariables>(initialSharedDemoVariables);
+
+  function updateSharedVariables(updates: Partial<SharedDemoVariables>) {
+    setSharedVariables((current) => ({ ...current, ...updates }));
+  }
+
   return (
     <div className={styles.page}>
       <section className={styles.hero}>
@@ -113,7 +122,15 @@ export function HomePage({ onConnectionChange }: HomePageProps) {
         title="Flujos guiados de tenants, invitaciones y membresias"
         description="Ejecuta operaciones frecuentes con formularios compactos, valores Postman y captura automatica de IDs reutilizables."
       >
-        <AccessManagementPanel />
+        <AccessManagementPanel updateVariables={updateSharedVariables} variables={sharedVariables} />
+      </SectionCard>
+
+      <SectionCard
+        eyebrow="Knowledge"
+        title="Flujos guiados RAG: bases, documentos, ingestion y retrieval"
+        description="Crea knowledge bases, sube documentos con FormData real, sigue ingestion y ejecuta busquedas o respuestas con citas."
+      >
+        <KnowledgePanel updateVariables={updateSharedVariables} variables={sharedVariables} />
       </SectionCard>
 
       <section className={styles.dashboardGrid} id="configuration">
