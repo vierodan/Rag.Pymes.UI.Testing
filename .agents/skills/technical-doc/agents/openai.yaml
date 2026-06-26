@@ -1,0 +1,4 @@
+interface:
+  display_name: "Technical Documentation"
+  short_description: "Create and update project documentation"
+  default_prompt: "Use $technical-doc to create or update clear technical documentation for this project."
