@@ -8,9 +8,9 @@ The SPA should make it easy to exercise backend workflows from a browser, inspec
 
 Project documentation is kept in `docs/`. The only `README.md` file in this workspace must remain this root file.
 
-- [Contributor and agent guidelines](AGENTS.md)
-- [API testing notes](docs/api-testing.md)
-- [SPA demo execution plan](docs/spa-demo-test.md)
+- [Contributor and agent guidelines](AGENTS.md): repository rules, workspace constraints, and backend read-only policy.
+- [API testing notes](docs/api-testing.md): operational usage, manual flows, smoke checklist, artifact refresh steps, and seed-script proposal.
+- [SPA demo execution plan](docs/spa-demo-test.md): phased implementation plan and prompts for each phase.
 
 ## Development
 
@@ -24,6 +24,8 @@ npm test
 ```
 
 The endpoint explorer is generated from `src/data/postmanCollection.json`, copied from the backend Postman collection, and enriched with the formal OpenAPI contract in `api-definition/RagPymes-v1.json`.
+
+For operational testing, refresh procedures, and smoke-test scenarios, use [docs/api-testing.md](docs/api-testing.md).
 
 Before implementing API-facing changes, inspect `../rag-pymes-backend/` or relaunch Codex with backend access:
 
