@@ -2,6 +2,7 @@ import apiDefinition from '../../api-definition/RagPymes-v1.json';
 import { apiConfig, hasConfiguredApi } from '../api/apiConfig';
 import { SectionCard } from '../components/shared/SectionCard';
 import postmanCollection from '../data/postmanCollection.json';
+import { AccessManagementPanel } from '../features/ragPymesApiDemo/components/AccessManagementPanel';
 import { ConnectionHealthPanel } from '../features/ragPymesApiDemo/components/ConnectionHealthPanel';
 import { RagPymesApiDemo } from '../features/ragPymesApiDemo/components/RagPymesApiDemo';
 import { buildCatalog } from '../lib/postman';
@@ -105,6 +106,14 @@ export function HomePage({ onConnectionChange }: HomePageProps) {
         description="Configura la API base URL, anade un Bearer token si lo necesitas y valida la disponibilidad del backend."
       >
         <ConnectionHealthPanel initialBaseUrl={apiConfig.baseUrl} onConnectionChange={onConnectionChange} />
+      </SectionCard>
+
+      <SectionCard
+        eyebrow="Access Management"
+        title="Flujos guiados de tenants, invitaciones y membresias"
+        description="Ejecuta operaciones frecuentes con formularios compactos, valores Postman y captura automatica de IDs reutilizables."
+      >
+        <AccessManagementPanel />
       </SectionCard>
 
       <section className={styles.dashboardGrid} id="configuration">
