@@ -45,6 +45,12 @@ All SPA documentation must live under `docs/`. The root `README.md` is the only 
 
 There must be exactly one file named `README.md` in the workspace, and it must stay at the repository root. Do not create `docs/README.md`, package-level README files, or duplicate README variants.
 
+## UX Target
+
+This SPA is an internal API testing tool intended to be used from desktop and laptop browsers. Desktop readability, dense operational controls, and wide-screen workflows are the primary design targets.
+
+Mobile support is not a requirement for this project. Do not spend implementation or verification effort optimizing mobile layouts unless the user explicitly asks for it in a future task.
+
 ## Coding Style & Naming Conventions
 
 Prefer TypeScript. Use 2-space indentation, named exports for shared modules, and PascalCase for components (`TenantSelector.tsx`). Use camelCase for functions, hooks, variables, and non-component files. Prefix custom hooks with `use`, for example `useTenantApi.ts`.

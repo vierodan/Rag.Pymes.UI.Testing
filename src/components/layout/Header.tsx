@@ -11,7 +11,7 @@ export function Header({ endpointCount, openApiVersion }: HeaderProps) {
       <div className={styles.brand}>
         <div className={styles.logo}>RP</div>
         <div>
-          <p className={styles.kicker}>Frontend foundation</p>
+          <p className={styles.kicker}>Testing console</p>
           <h1 className={styles.title}>RagPymes API Testing SPA</h1>
         </div>
       </div>

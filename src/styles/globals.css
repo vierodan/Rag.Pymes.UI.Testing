@@ -1,15 +1,16 @@
 :root {
-  --color-page: #f3f5f0;
-  --color-surface: #fffdf8;
-  --color-primary: #175c62;
-  --color-primary-strong: #0d3d42;
-  --color-accent: #d98b35;
-  --color-accent-strong: #9f5a19;
-  --color-ink: #263440;
-  --color-ink-strong: #13212b;
-  --color-ink-soft: #5c6c78;
-  --color-line: rgba(19, 33, 43, 0.1);
-  --color-success: #267356;
+  --color-page: #eef3f7;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f7fafc;
+  --color-primary: #22577a;
+  --color-primary-strong: #14334a;
+  --color-accent: #2a9d8f;
+  --color-accent-strong: #b06416;
+  --color-ink: #263846;
+  --color-ink-strong: #102331;
+  --color-ink-soft: #627282;
+  --color-line: rgba(16, 35, 49, 0.12);
+  --color-success: #1f7a4d;
   --color-danger: #b63a34;
   --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   --font-body: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
@@ -32,6 +33,7 @@ html {
 body {
   margin: 0;
   min-width: 320px;
+  overflow-x: hidden;
 }
 
 button,
@@ -56,4 +58,6 @@ a {
 
 #root {
   min-height: 100vh;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
