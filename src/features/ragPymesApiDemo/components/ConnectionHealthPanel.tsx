@@ -2,7 +2,12 @@ import { useMemo, useState } from 'react';
 import { setApiBaseUrl } from '../../../api/apiConfig';
 import { getLastResponseStatus, setAccessTokenGetter } from '../../../api/httpClient';
 import { ragPymesApi } from '../../../api/ragPymesApi';
-import type { ConnectionSummary, ConnectionState } from '../../../types/connection';
+import type {
+  ApiConnectionSettings,
+  ConnectionSummary,
+  ConnectionState,
+  UpdateApiConnectionSettings,
+} from '../../../types/connection';
 import { formatPayload, normalizeApiError, type NormalizedApiError } from './apiResultUtils';
 import styles from './ConnectionHealthPanel.module.css';
 
@@ -26,8 +31,9 @@ interface HealthResult {
 }
 
 interface ConnectionHealthPanelProps {
-  initialBaseUrl: string;
+  connectionSettings: ApiConnectionSettings;
   onConnectionChange: (summary: ConnectionSummary) => void;
+  onConnectionSettingsChange: UpdateApiConnectionSettings;
 }
 
 const healthEndpoints: HealthEndpoint[] = [
@@ -51,9 +57,11 @@ const healthEndpoints: HealthEndpoint[] = [
   },
 ];
 
-export function ConnectionHealthPanel({ initialBaseUrl, onConnectionChange }: ConnectionHealthPanelProps) {
-  const [baseUrl, setBaseUrl] = useState(initialBaseUrl);
-  const [bearerToken, setBearerToken] = useState('');
+export function ConnectionHealthPanel({
+  connectionSettings,
+  onConnectionChange,
+  onConnectionSettingsChange,
+}: ConnectionHealthPanelProps) {
   const [activeEndpointId, setActiveEndpointId] = useState<HealthEndpointId | null>(null);
   const [result, setResult] = useState<HealthResult | null>(null);
 
@@ -63,7 +71,7 @@ export function ConnectionHealthPanel({ initialBaseUrl, onConnectionChange }: Co
   );
 
   async function runHealthCheck(endpoint: HealthEndpoint) {
-    const trimmedBaseUrl = baseUrl.trim();
+    const trimmedBaseUrl = connectionSettings.baseUrl.trim();
     const invalidMessage = getBaseUrlValidationMessage(trimmedBaseUrl);
 
     if (invalidMessage) {
@@ -91,7 +99,7 @@ export function ConnectionHealthPanel({ initialBaseUrl, onConnectionChange }: Co
     }
 
     setApiBaseUrl(trimmedBaseUrl);
-    setAccessTokenGetter(() => bearerToken.trim() || undefined);
+    setAccessTokenGetter(() => connectionSettings.bearerToken.trim() || undefined);
     setActiveEndpointId(endpoint.id);
     onConnectionChange({
       endpoint: endpoint.path,
@@ -158,19 +166,19 @@ export function ConnectionHealthPanel({ initialBaseUrl, onConnectionChange }: Co
         <label>
           <span>API base URL</span>
           <input
-            onChange={(event) => setBaseUrl(event.target.value)}
+            onChange={(event) => onConnectionSettingsChange({ baseUrl: event.target.value })}
             placeholder="http://localhost:5088"
             type="url"
-            value={baseUrl}
+            value={connectionSettings.baseUrl}
           />
         </label>
         <label>
           <span>Bearer token opcional</span>
           <textarea
-            onChange={(event) => setBearerToken(event.target.value)}
+            onChange={(event) => onConnectionSettingsChange({ bearerToken: event.target.value })}
             placeholder="Pega aqui el token si quieres probar endpoints protegidos"
             rows={3}
-            value={bearerToken}
+            value={connectionSettings.bearerToken}
           />
         </label>
       </div>

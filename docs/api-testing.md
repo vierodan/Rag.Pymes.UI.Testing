@@ -52,6 +52,8 @@ const tenants = await ragPymesApi.accessManagement.listMyTenants();
 
 Document uploads should use `ragPymesApi.knowledge.uploadKnowledgeDocument(...)`; it builds the `FormData` payload expected by OpenAPI. Keep the endpoint explorer available for advanced/manual API testing and for comparing raw Postman examples against the typed layer.
 
+The advanced endpoint explorer must remain behind the guided flows. It reuses the global API base URL, Bearer token, and shared demo variables from `HomePage`, and it executes requests through `httpClient.execute(...)` so JSON, timeouts, auth, query params, and `FormData` stay consistent with the typed API layer. The local OpenAPI contract and Postman collection are expected to expose the same endpoint count; the current baseline is 34 OpenAPI endpoints and 34 Postman endpoints.
+
 ## Shared Demo Variables
 
 The guided Access Management and Knowledge panels share editable variables so one API response can feed the next request:
