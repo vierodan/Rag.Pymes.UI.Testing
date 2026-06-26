@@ -1,70 +1,149 @@
+import apiDefinition from '../../api-definition/RagPymes-v1.json';
+import { apiConfig, hasConfiguredApi } from '../api/apiConfig';
+import { SectionCard } from '../components/shared/SectionCard';
+import postmanCollection from '../data/postmanCollection.json';
 import { RagPymesApiDemo } from '../features/ragPymesApiDemo/components/RagPymesApiDemo';
+import { buildCatalog } from '../lib/postman';
+import type { OpenApiDocument } from '../types/openapi';
 import styles from './HomePage.module.css';
 
-const contractHighlights = [
-  'OpenAPI define 34 operaciones y la coleccion Postman aporta ejemplos ejecutables.',
-  'El backend en ../rag-pymes-backend/ es contexto de solo lectura para validar contratos.',
-  'Los flujos principales cubren tenants, invitaciones, knowledge bases, documentos, ingestion y RAG.',
+const apiDocument = apiDefinition as OpenApiDocument;
+const catalog = buildCatalog(postmanCollection);
+
+const configItems = [
+  {
+    detail: apiConfig.baseUrl,
+    label: 'API base URL',
+    state: hasConfiguredApi() ? 'Configurada' : 'Pendiente',
+  },
+  {
+    detail: `${apiDocument.info.title} ${apiDocument.info.version} - ${Object.keys(apiDocument.paths).length} paths`,
+    label: 'Contrato OpenAPI',
+    state: 'Cargado',
+  },
+  {
+    detail: `${catalog.name} - ${catalog.endpoints.length} endpoints`,
+    label: 'Coleccion Postman',
+    state: 'Sincronizada',
+  },
 ];
 
-const roadmapItems = [
-  'Convertir health checks y conexion en un panel guiado.',
-  'Crear workbenches especificos para Access Management y Knowledge.',
-  'Mantener el endpoint explorer como herramienta avanzada para operaciones no guiadas.',
+const flowCards = [
+  {
+    detail: 'Comprueba disponibilidad, readiness y contrato antes de lanzar pruebas protegidas.',
+    metric: '3 checks',
+    title: 'Health y conexion',
+  },
+  {
+    detail: 'Registra tenants, provisiona entornos, invita usuarios y valida memberships.',
+    metric: 'IAM',
+    title: 'Access Management',
+  },
+  {
+    detail: 'Crea knowledge bases, sube documentos, revisa ingestion y ejecuta reindex.',
+    metric: 'RAG',
+    title: 'Knowledge pipeline',
+  },
+  {
+    detail: 'Ejecuta busquedas y respuestas fundamentadas con citas sobre documentos indexados.',
+    metric: 'QA',
+    title: 'Search y answers',
+  },
+];
+
+const workbenchSteps = [
+  'Configurar base URL y token Bearer si el endpoint lo requiere.',
+  'Elegir un flujo guiado o abrir el explorador avanzado.',
+  'Ejecutar request, revisar payload, estado HTTP y ProblemDetails.',
 ];
 
 export function HomePage() {
   return (
     <div className={styles.page}>
       <section className={styles.hero}>
-        <div className={styles.heroCopy}>
-          <p className={styles.eyebrow}>API demo</p>
-          <h2 className={styles.heroTitle}>Una UI guiada para probar RagPymes sin inventar contratos.</h2>
+        <div className={styles.heroPanel}>
+          <p className={styles.eyebrow}>RagPymes API Testing SPA</p>
+          <h2 className={styles.heroTitle}>Consola operativa para validar la API de RagPymes.</h2>
           <p className={styles.heroLead}>
-            La SPA combina la definicion OpenAPI local con la coleccion Postman documentada para ejecutar pruebas reales
-            contra la API y preparar flujos de demo por dominio.
+            Un workspace React + Vite para probar contratos, payloads y respuestas reales sin tocar el backend.
           </p>
+          <div className={styles.heroActions} aria-label="Acciones principales">
+            <a className={styles.primaryAction} href="#endpoint-explorer">
+              Abrir explorador
+            </a>
+            <a className={styles.secondaryAction} href="#configuration">
+              Revisar configuracion
+            </a>
+          </div>
         </div>
 
-        <div className={styles.heroStats}>
-          <div>
-            <span className={styles.statValue}>OpenAPI-first</span>
-            <span className={styles.statLabel}>contrato formal en api-definition/RagPymes-v1.json</span>
+        <div className={styles.heroStatus} aria-label="Resumen del entorno">
+          <div className={styles.signal}>
+            <span className={styles.signalValue}>{hasConfiguredApi() ? 'Lista' : 'Pendiente'}</span>
+            <span className={styles.signalLabel}>configuracion API</span>
           </div>
-          <div>
-            <span className={styles.statValue}>Postman examples</span>
-            <span className={styles.statLabel}>bodies, variables y descripciones operativas desde la coleccion</span>
+          <div className={styles.signal}>
+            <span className={styles.signalValue}>{catalog.endpoints.length}</span>
+            <span className={styles.signalLabel}>endpoints Postman</span>
           </div>
-          <div>
-            <span className={styles.statValue}>HTTP real</span>
-            <span className={styles.statLabel}>base URL configurable y Bearer token opcional para endpoints protegidos</span>
+          <div className={styles.signal}>
+            <span className={styles.signalValue}>{Object.keys(apiDocument.paths).length}</span>
+            <span className={styles.signalLabel}>paths OpenAPI</span>
           </div>
         </div>
       </section>
 
-      <section className={styles.grid}>
-        <section className={styles.infoCard}>
-          <p className={styles.cardEyebrow}>Contrato</p>
-          <h3>Lo que expone la API</h3>
-          <ul>
-            {contractHighlights.map((item) => (
-              <li key={item}>{item}</li>
+      <section className={styles.dashboardGrid} id="configuration">
+        <SectionCard
+          eyebrow="Entorno"
+          title="Estado de configuracion"
+          description="La app muestra desde donde ejecutara las pruebas y que artefactos locales usa como contrato."
+        >
+          <div className={styles.configList}>
+            {configItems.map((item) => (
+              <article className={styles.configItem} key={item.label}>
+                <div>
+                  <p className={styles.itemLabel}>{item.label}</p>
+                  <p className={styles.itemDetail}>{item.detail}</p>
+                </div>
+                <span className={styles.itemState}>{item.state}</span>
+              </article>
             ))}
-          </ul>
-        </section>
+          </div>
+        </SectionCard>
 
-        <section className={styles.infoCard}>
-          <p className={styles.cardEyebrow}>Siguiente paso</p>
-          <h3>Como crecera esta demo</h3>
-          <ul>
-            {roadmapItems.map((item) => (
-              <li key={item}>{item}</li>
+        <SectionCard
+          eyebrow="Uso"
+          title="Modo de trabajo"
+          description="Pensado para validar endpoints, preparar demos y capturar errores de contrato rapidamente."
+        >
+          <ol className={styles.stepList}>
+            {workbenchSteps.map((step) => (
+              <li key={step}>{step}</li>
             ))}
-          </ul>
-        </section>
+          </ol>
+        </SectionCard>
       </section>
 
-      <RagPymesApiDemo />
+      <SectionCard
+        eyebrow="Flujos"
+        title="Superficie funcional"
+        description="Los recorridos principales de RagPymes quedan visibles antes de entrar al detalle endpoint por endpoint."
+      >
+        <div className={styles.flowGrid}>
+          {flowCards.map((flow) => (
+            <article className={styles.flowCard} key={flow.title}>
+              <span className={styles.flowMetric}>{flow.metric}</span>
+              <h3>{flow.title}</h3>
+              <p>{flow.detail}</p>
+            </article>
+          ))}
+        </div>
+      </SectionCard>
+
+      <div id="endpoint-explorer">
+        <RagPymesApiDemo />
+      </div>
     </div>
   );
 }
