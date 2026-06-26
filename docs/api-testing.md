@@ -10,6 +10,7 @@ The current endpoint catalog is loaded from `src/data/postmanCollection.json`, c
 
 The SPA now follows a guided demo structure:
 
+- `src/api/` contains the typed RagPymes API layer: configuration, HTTP client, DTO contracts, API errors, and domain methods.
 - `src/components/layout/` contains `AppShell`, `Header`, and `MainContent`.
 - `src/components/shared/` contains reusable presentation components such as `SectionCard`.
 - `src/pages/HomePage.tsx` introduces the API testing purpose and routes users into the demo.
@@ -18,3 +19,35 @@ The SPA now follows a guided demo structure:
 - `src/styles/globals.css` owns base tokens and global element defaults; component styling should use CSS Modules.
 
 Do not encode guessed backend behavior in the frontend. If an endpoint, payload, or response shape is unclear, inspect the backend first and document the confirmed behavior here.
+
+## Typed API Layer
+
+Use `src/api/ragPymesApi.ts` for application flows instead of hand-written `fetch` calls. The methods are grouped by domain:
+
+- `ragPymesApi.health` for `/health`, `/health/live`, and `/health/ready`.
+- `ragPymesApi.accessManagement` for tenant registration, provisioning, invitations, memberships, and knowledge base grants.
+- `ragPymesApi.platformAdministration` for platform tenant listing, suspension, and reactivation.
+- `ragPymesApi.knowledge` for knowledge bases, document upload, ingestion runs, reindexing, search, and answers.
+
+Configure the API through Vite env vars:
+
+```bash
+VITE_RAGPYMES_API_BASE_URL=http://localhost:5088
+VITE_RAGPYMES_API_TIMEOUT_MS=30000
+```
+
+Example usage:
+
+```ts
+import { setAccessTokenGetter } from '../api/httpClient';
+import { ragPymesApi } from '../api/ragPymesApi';
+
+setAccessTokenGetter(() => sessionStorage.getItem('ragpymes_access_token'));
+
+const ready = await ragPymesApi.health.getReadyHealth();
+const tenants = await ragPymesApi.accessManagement.listMyTenants();
+```
+
+`src/api/httpClient.ts` handles query params, JSON bodies, `FormData`, optional Bearer tokens, request timeouts, and external `AbortSignal`s. `src/api/apiError.ts` parses `ProblemDetails`; catch `ApiHttpError` to inspect `status`, `problem`, and the original payload.
+
+Document uploads should use `ragPymesApi.knowledge.uploadKnowledgeDocument(...)`; it builds the `FormData` payload expected by OpenAPI. Keep the endpoint explorer available for advanced/manual API testing and for comparing raw Postman examples against the typed layer.
