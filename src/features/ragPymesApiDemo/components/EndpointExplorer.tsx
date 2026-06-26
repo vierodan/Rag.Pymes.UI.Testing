@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import apiDefinition from '../../../../api-definition/RagPymes-v1.json';
+import { httpClient } from '../../../api/httpClient';
 import postmanCollection from '../../../data/postmanCollection.json';
 import { buildOpenApiContractIndex } from '../../../lib/openapi';
 import { buildCatalog, resolveTemplateValue } from '../../../lib/postman';
+import type { ApiConnectionSettings, UpdateApiConnectionSettings } from '../../../types/connection';
 import type { OpenApiDocument, OperationContract } from '../../../types/openapi';
 import type { ApiEndpoint, EndpointField } from '../../../types/postman';
+import type { SharedDemoVariables, UpdateSharedDemoVariables } from '../types/demoVariables';
+import { formatPayload, normalizeApiError } from './apiResultUtils';
 import styles from './EndpointExplorer.module.css';
 
 type TokenMode = 'required' | 'always' | 'never';
@@ -20,13 +24,24 @@ interface ApiResponse {
   statusText: string;
 }
 
+interface EndpointExplorerProps {
+  connectionSettings: ApiConnectionSettings;
+  onConnectionSettingsChange: UpdateApiConnectionSettings;
+  updateVariables: UpdateSharedDemoVariables;
+  variables: SharedDemoVariables;
+}
+
+interface BuiltRequest {
+  auth: boolean;
+  body?: BodyInit | string;
+  headers: Headers;
+  path: string;
+  query: Record<string, string>;
+}
+
 const catalog = buildCatalog(postmanCollection);
 const contractIndex = buildOpenApiContractIndex(apiDefinition as OpenApiDocument);
-const defaultBaseUrl =
-  import.meta.env.VITE_RAGPYMES_API_BASE_URL ??
-  (apiDefinition as OpenApiDocument).servers?.[0]?.url ??
-  catalog.variables.find((variable) => variable.key === 'baseUrl')?.value ??
-  'http://localhost:5088';
+const catalogVariableKeys = new Set(catalog.variables.map((variable) => variable.key));
 
 const bodyInitialState = Object.fromEntries(
   catalog.endpoints
@@ -47,17 +62,30 @@ const variableInitialState = Object.fromEntries(
     .map((variable) => [variable.key, variable.value]),
 );
 
+const sharedVariableByPostmanKey: Partial<Record<string, keyof SharedDemoVariables>> = {
+  documentId: 'documentId',
+  ingestionRunId: 'ingestionRunId',
+  invitationId: 'invitationId',
+  knowledgeBaseId: 'knowledgeBaseId',
+  membershipId: 'membershipId',
+  tenantId: 'tenantId',
+  token: 'invitationToken',
+};
+
 const cx = (...names: Array<string | false | null | undefined>) =>
   names
     .filter(Boolean)
     .map((name) => styles[name as string])
     .join(' ');
 
-export function EndpointExplorer() {
-  const [baseUrl, setBaseUrl] = useState(defaultBaseUrl);
-  const [accessToken, setAccessToken] = useState('');
+export function EndpointExplorer({
+  connectionSettings,
+  onConnectionSettingsChange,
+  updateVariables,
+  variables: sharedVariables,
+}: EndpointExplorerProps) {
   const [tokenMode, setTokenMode] = useState<TokenMode>('required');
-  const [variables, setVariables] = useState<Record<string, string>>(variableInitialState);
+  const [localVariables, setLocalVariables] = useState<Record<string, string>>(variableInitialState);
   const [pathOverrides, setPathOverrides] = useState<Record<string, string>>({});
   const [queryByEndpoint, setQueryByEndpoint] =
     useState<Record<string, Record<string, string>>>(queryInitialState);
@@ -70,6 +98,11 @@ export function EndpointExplorer() {
   const [isSending, setIsSending] = useState(false);
   const [response, setResponse] = useState<ApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const requestVariables = useMemo<Record<string, string>>(
+    () => buildRequestVariables(localVariables, sharedVariables),
+    [localVariables, sharedVariables],
+  );
 
   const filteredEndpoints = useMemo(() => {
     const normalizedSearch = search.toLowerCase().trim();
@@ -91,11 +124,17 @@ export function EndpointExplorer() {
   const selectedContract = contractIndex.get(`${selectedEndpoint.method} ${selectedEndpoint.openApiPath}`);
 
   function updateVariable(key: string, value: string) {
-    setVariables((current) => ({ ...current, [key]: value }));
+    const sharedKey = sharedVariableByPostmanKey[key];
+    if (sharedKey) {
+      updateVariables({ [sharedKey]: value } as Partial<SharedDemoVariables>);
+      return;
+    }
+
+    setLocalVariables((current) => ({ ...current, [key]: value }));
   }
 
   function updatePathValue(endpoint: ApiEndpoint, field: EndpointField, value: string) {
-    if (Object.hasOwn(variables, field.key)) {
+    if (catalogVariableKeys.has(field.key)) {
       updateVariable(field.key, value);
       return;
     }
@@ -117,8 +156,14 @@ export function EndpointExplorer() {
     setBodyByEndpoint((current) => ({ ...current, [endpoint.id]: value }));
   }
 
+  function getVariableValue(key: string) {
+    const sharedKey = sharedVariableByPostmanKey[key];
+
+    return sharedKey ? sharedVariables[sharedKey] : localVariables[key] ?? '';
+  }
+
   function getPathValue(endpoint: ApiEndpoint, field: EndpointField) {
-    return variables[field.key] ?? pathOverrides[`${endpoint.id}:${field.key}`] ?? '';
+    return requestVariables[field.key] ?? pathOverrides[`${endpoint.id}:${field.key}`] ?? '';
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -130,31 +175,39 @@ export function EndpointExplorer() {
     try {
       const request = buildRequest(selectedEndpoint);
       const startedAt = performance.now();
-      const result = await fetch(request.url, request.init);
-      const body = await readResponseBody(result);
+      const result = await httpClient.execute(selectedEndpoint.method, request.path, {
+        auth: request.auth,
+        body: request.body,
+        headers: request.headers,
+        query: request.query,
+      });
 
       setResponse({
-        body,
+        body: formatResponseBody(result.payload),
         durationMs: Math.round(performance.now() - startedAt),
-        headers: Array.from(result.headers.entries()),
+        headers: result.headers,
         ok: result.ok,
-        requestUrl: request.url,
+        requestUrl: result.requestUrl,
         status: result.status,
         statusText: result.statusText,
       });
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Unexpected request error');
+      const normalizedError = normalizeApiError(
+        requestError,
+        'Comprueba base URL, CORS, token Bearer y variables de path/query.',
+      );
+      setError(`${normalizedError.name}: ${normalizedError.message}`);
     } finally {
       setIsSending(false);
     }
   }
 
-  function buildRequest(endpoint: ApiEndpoint) {
+  function buildRequest(endpoint: ApiEndpoint): BuiltRequest {
     const headers = new Headers();
     const method = endpoint.method;
     const endpointQuery = queryByEndpoint[endpoint.id] ?? {};
     const path = endpoint.path.replace(/:([A-Za-z][A-Za-z0-9_]*)/g, (_, key: string) => {
-      const value = variables[key] ?? pathOverrides[`${endpoint.id}:${key}`] ?? '';
+      const value = requestVariables[key] ?? pathOverrides[`${endpoint.id}:${key}`] ?? '';
       if (!value.trim()) {
         throw new Error(`Missing path variable: ${key}`);
       }
@@ -162,43 +215,46 @@ export function EndpointExplorer() {
       return encodeURIComponent(value);
     });
 
-    const url = new URL(`${baseUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`);
-    endpoint.query.forEach((query) => {
-      const rawValue = endpointQuery[query.key] ?? query.value;
-      const value = resolveTemplateValue(rawValue, variables);
+    const query: Record<string, string> = {};
+    endpoint.query.forEach((queryField) => {
+      const rawValue = endpointQuery[queryField.key] ?? queryField.value;
+      const value = resolveTemplateValue(rawValue, requestVariables);
       if (value) {
-        url.searchParams.set(query.key, value);
+        query[queryField.key] = value;
       }
     });
 
     endpoint.headers.forEach((header) => {
-      const value = resolveTemplateValue(header.value, variables);
+      const value = resolveTemplateValue(header.value, requestVariables);
       if (value) {
         headers.set(header.key, value);
       }
     });
 
-    if (shouldAttachToken(endpoint) && accessToken.trim()) {
-      headers.set('Authorization', `Bearer ${accessToken.trim()}`);
-    }
+    const request: BuiltRequest = {
+      auth: shouldAttachToken(endpoint),
+      headers,
+      path,
+      query,
+    };
 
-    const init: RequestInit = { method, headers };
     if (method !== 'GET' && method !== 'HEAD' && endpoint.body) {
       if (endpoint.body.mode === 'formdata') {
         const formData = new FormData();
         endpoint.body.formdata.forEach((field) => {
           const key = `${endpoint.id}:${field.key}`;
           const file = filesByField[key];
-          formData.append(field.key, file ?? formValuesByField[key] ?? resolveTemplateValue(field.value, variables));
+          const value = formValuesByField[key] ?? resolveTemplateValue(field.value, requestVariables);
+          formData.append(field.key, file ?? value);
         });
         headers.delete('Content-Type');
-        init.body = formData;
+        request.body = formData;
       } else {
-        init.body = bodyByEndpoint[endpoint.id] ?? endpoint.body.raw ?? '';
+        request.body = bodyByEndpoint[endpoint.id] ?? endpoint.body.raw ?? '';
       }
     }
 
-    return { init, url: url.toString() };
+    return request;
   }
 
   function shouldAttachToken(endpoint: ApiEndpoint) {
@@ -211,18 +267,36 @@ export function EndpointExplorer() {
 
   return (
     <div className={styles.explorer}>
+      <section className={cx('advanced-summary')} aria-label="Advanced explorer catalog status">
+        <div>
+          <span>Postman</span>
+          <strong>{catalog.endpoints.length} endpoints</strong>
+        </div>
+        <div>
+          <span>OpenAPI</span>
+          <strong>{contractIndex.size} endpoints</strong>
+        </div>
+        <div>
+          <span>Configuracion</span>
+          <strong>{connectionSettings.baseUrl || 'Sin base URL'}</strong>
+        </div>
+      </section>
+
       <section className={cx('settings-band')} aria-label="Request settings">
         <label>
-          API base URL
-          <input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} />
+          API base URL global
+          <input
+            value={connectionSettings.baseUrl}
+            onChange={(event) => onConnectionSettingsChange({ baseUrl: event.target.value })}
+          />
         </label>
         <label>
-          Bearer token
+          Bearer token global
           <input
             type="password"
-            value={accessToken}
+            value={connectionSettings.bearerToken}
             placeholder="Paste access token"
-            onChange={(event) => setAccessToken(event.target.value)}
+            onChange={(event) => onConnectionSettingsChange({ bearerToken: event.target.value })}
           />
         </label>
         <label>
@@ -241,10 +315,7 @@ export function EndpointExplorer() {
           .map((variable) => (
             <label key={variable.key} title={variable.description}>
               {variable.key}
-              <input
-                value={variables[variable.key] ?? ''}
-                onChange={(event) => updateVariable(variable.key, event.target.value)}
-              />
+              <input value={getVariableValue(variable.key)} onChange={(event) => updateVariable(variable.key, event.target.value)} />
             </label>
           ))}
       </section>
@@ -298,13 +369,21 @@ export function EndpointExplorer() {
 
           <code className={cx('path-preview')}>{selectedEndpoint.path}</code>
 
-          <section className={styles.description}>
-            {formatDescription(selectedEndpoint.description).map((line) => (
-              <p key={line}>{line}</p>
+          <section className={styles.description} aria-label="Postman description">
+            <div className={cx('section-title')}>Postman description</div>
+            {formatDescription(selectedEndpoint.description).map((line, index) => (
+              <p key={`${line}-${index}`}>{line}</p>
             ))}
           </section>
 
-          {selectedContract && <ContractSummary contract={selectedContract} />}
+          {selectedContract ? (
+            <ContractSummary contract={selectedContract} />
+          ) : (
+            <section className={cx('contract-summary')} aria-label="OpenAPI contract">
+              <div className={cx('section-title')}>OpenAPI contract</div>
+              <p className={cx('empty-state')}>No OpenAPI operation matched this Postman endpoint.</p>
+            </section>
+          )}
 
           {selectedEndpoint.pathVariables.length > 0 && (
             <Fieldset title="Path variables">
@@ -365,7 +444,7 @@ export function EndpointExplorer() {
                       />
                     ) : (
                       <input
-                        defaultValue={resolveTemplateValue(field.value, variables)}
+                        value={formValuesByField[key] ?? resolveTemplateValue(field.value, requestVariables)}
                         onChange={(event) =>
                           setFormValuesByField((current) => ({
                             ...current,
@@ -404,7 +483,7 @@ export function EndpointExplorer() {
                 <summary>Response headers</summary>
                 <pre>{response.headers.map(([key, value]) => `${key}: ${value}`).join('\n')}</pre>
               </details>
-              <pre className={cx('response-body')}>{response.body || '(empty response)'}</pre>
+              <pre className={cx('response-body')}>{response.body}</pre>
             </>
           ) : (
             <p className={cx('empty-state')}>Send a request to inspect status, headers, and body.</p>
@@ -427,10 +506,11 @@ function Fieldset({ children, title }: { children: ReactNode; title: string }) {
 function ContractSummary({ contract }: { contract: OperationContract }) {
   return (
     <section className={cx('contract-summary')} aria-label="OpenAPI contract">
-      <div className={cx('section-title')}>API contract</div>
+      <div className={cx('section-title')}>OpenAPI contract</div>
       <div className={cx('contract-grid')}>
         <ContractItem label="operationId" value={contract.operationId} />
         <ContractItem label="tags" value={contract.tags.join(', ')} />
+        <ContractItem label="summary" value={contract.summary || 'None'} />
         <ContractItem label="request" value={contract.requestContentTypes.join(', ') || 'No body'} />
         <ContractItem label="request schema" value={contract.requestSchemaNames.join(', ') || 'None'} />
         <ContractItem label="responses" value={contract.responseCodes.join(', ')} />
@@ -451,6 +531,22 @@ function ContractItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+function buildRequestVariables(
+  localVariables: Record<string, string>,
+  sharedVariables: SharedDemoVariables,
+): Record<string, string> {
+  return {
+    ...localVariables,
+    documentId: sharedVariables.documentId,
+    ingestionRunId: sharedVariables.ingestionRunId,
+    invitationId: sharedVariables.invitationId,
+    knowledgeBaseId: sharedVariables.knowledgeBaseId,
+    membershipId: sharedVariables.membershipId,
+    tenantId: sharedVariables.tenantId,
+    token: sharedVariables.invitationToken,
+  };
+}
+
 function formatDescription(description: string) {
   return description
     .split('\n')
@@ -464,15 +560,14 @@ function formatDescription(description: string) {
     .filter(Boolean);
 }
 
-async function readResponseBody(response: Response) {
-  const text = await response.text();
-  if (!text) {
-    return '';
+function formatResponseBody(payload: unknown) {
+  if (payload === null || payload === undefined || payload === '') {
+    return '(empty response)';
   }
 
-  try {
-    return JSON.stringify(JSON.parse(text), null, 2);
-  } catch {
-    return text;
+  if (typeof payload === 'string') {
+    return payload;
   }
+
+  return formatPayload(payload, '(empty response)');
 }

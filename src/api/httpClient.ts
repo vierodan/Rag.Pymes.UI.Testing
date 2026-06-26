@@ -1,7 +1,7 @@
 import { apiConfig } from './apiConfig';
 import { ApiHttpError } from './apiError';
 
-type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
 type QueryValue = string | number | boolean | null | undefined;
 type QueryParams = Record<string, QueryValue>;
 type AccessTokenGetter = () => string | null | undefined;
@@ -13,6 +13,15 @@ export interface HttpRequestOptions {
   query?: QueryParams;
   signal?: AbortSignal;
   timeoutMs?: number;
+}
+
+export interface HttpResponseSnapshot {
+  headers: Array<[string, string]>;
+  ok: boolean;
+  payload: unknown;
+  requestUrl: string;
+  status: number;
+  statusText: string;
 }
 
 let accessTokenGetter: AccessTokenGetter | null = null;
@@ -47,12 +56,13 @@ export function resolveApiUrl(path: string, query?: QueryParams) {
   return url.toString();
 }
 
-async function request<T>(method: HttpMethod, path: string, options: HttpRequestOptions = {}) {
+async function execute(method: HttpMethod, path: string, options: HttpRequestOptions = {}): Promise<HttpResponseSnapshot> {
   const requestSignal = createRequestSignal(options.signal, options.timeoutMs ?? apiConfig.timeoutMs);
 
   try {
     const body = options.body;
-    const response = await fetch(resolveApiUrl(path, options.query), {
+    const requestUrl = resolveApiUrl(path, options.query);
+    const response = await fetch(requestUrl, {
       body: serializeBody(body),
       headers: buildHeaders(body, options.headers, options.auth ?? true),
       method,
@@ -62,14 +72,27 @@ async function request<T>(method: HttpMethod, path: string, options: HttpRequest
     lastResponseStatus = response.status;
     const payload = await parseResponse(response);
 
-    if (!response.ok) {
-      throw new ApiHttpError(response.status, response.statusText, payload);
-    }
-
-    return payload as T;
+    return {
+      headers: Array.from(response.headers.entries()),
+      ok: response.ok,
+      payload,
+      requestUrl,
+      status: response.status,
+      statusText: response.statusText,
+    };
   } finally {
     requestSignal.cleanup();
   }
+}
+
+async function request<T>(method: HttpMethod, path: string, options: HttpRequestOptions = {}) {
+  const response = await execute(method, path, options);
+
+  if (!response.ok) {
+    throw new ApiHttpError(response.status, response.statusText, response.payload);
+  }
+
+  return response.payload as T;
 }
 
 function createRequestSignal(externalSignal: AbortSignal | undefined, timeoutMs: number) {
@@ -158,6 +181,7 @@ async function parseResponse(response: Response) {
 
 export const httpClient = {
   delete: <T>(path: string, options?: Omit<HttpRequestOptions, 'body'>) => request<T>('DELETE', path, options),
+  execute,
   get: <T>(path: string, options?: Omit<HttpRequestOptions, 'body'>) => request<T>('GET', path, options),
   patch: <T>(path: string, body?: unknown, options?: Omit<HttpRequestOptions, 'body'>) =>
     request<T>('PATCH', path, { ...options, body }),

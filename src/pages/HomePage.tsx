@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import apiDefinition from '../../api-definition/RagPymes-v1.json';
-import { apiConfig, hasConfiguredApi } from '../api/apiConfig';
+import { apiConfig, setApiBaseUrl } from '../api/apiConfig';
+import { setAccessTokenGetter } from '../api/httpClient';
 import { SectionCard } from '../components/shared/SectionCard';
 import postmanCollection from '../data/postmanCollection.json';
 import { AccessManagementPanel } from '../features/ragPymesApiDemo/components/AccessManagementPanel';
@@ -8,31 +9,15 @@ import { ConnectionHealthPanel } from '../features/ragPymesApiDemo/components/Co
 import { KnowledgePanel } from '../features/ragPymesApiDemo/components/KnowledgePanel';
 import { RagPymesApiDemo } from '../features/ragPymesApiDemo/components/RagPymesApiDemo';
 import { initialSharedDemoVariables, type SharedDemoVariables } from '../features/ragPymesApiDemo/types/demoVariables';
+import { buildOpenApiContractIndex } from '../lib/openapi';
 import { buildCatalog } from '../lib/postman';
-import type { ConnectionSummary } from '../types/connection';
+import type { ApiConnectionSettings, ConnectionSummary } from '../types/connection';
 import type { OpenApiDocument } from '../types/openapi';
 import styles from './HomePage.module.css';
 
 const apiDocument = apiDefinition as OpenApiDocument;
 const catalog = buildCatalog(postmanCollection);
-
-const configItems = [
-  {
-    detail: apiConfig.baseUrl,
-    label: 'API base URL',
-    state: hasConfiguredApi() ? 'Configurada' : 'Pendiente',
-  },
-  {
-    detail: `${apiDocument.info.title} ${apiDocument.info.version} - ${Object.keys(apiDocument.paths).length} paths`,
-    label: 'Contrato OpenAPI',
-    state: 'Cargado',
-  },
-  {
-    detail: `${catalog.name} - ${catalog.endpoints.length} endpoints`,
-    label: 'Coleccion Postman',
-    state: 'Sincronizada',
-  },
-];
+const contractIndex = buildOpenApiContractIndex(apiDocument);
 
 const flowCards = [
   {
@@ -69,10 +54,41 @@ interface HomePageProps {
 
 export function HomePage({ onConnectionChange }: HomePageProps) {
   const [sharedVariables, setSharedVariables] = useState<SharedDemoVariables>(initialSharedDemoVariables);
+  const [connectionSettings, setConnectionSettings] = useState<ApiConnectionSettings>({
+    baseUrl: apiConfig.baseUrl,
+    bearerToken: '',
+  });
+
+  useEffect(() => {
+    setApiBaseUrl(connectionSettings.baseUrl);
+    setAccessTokenGetter(() => connectionSettings.bearerToken.trim() || undefined);
+  }, [connectionSettings.baseUrl, connectionSettings.bearerToken]);
 
   function updateSharedVariables(updates: Partial<SharedDemoVariables>) {
     setSharedVariables((current) => ({ ...current, ...updates }));
   }
+
+  function updateConnectionSettings(updates: Partial<ApiConnectionSettings>) {
+    setConnectionSettings((current) => ({ ...current, ...updates }));
+  }
+
+  const configItems = [
+    {
+      detail: connectionSettings.baseUrl,
+      label: 'API base URL',
+      state: connectionSettings.baseUrl.trim() ? 'Configurada' : 'Pendiente',
+    },
+    {
+      detail: `${apiDocument.info.title} ${apiDocument.info.version} - ${contractIndex.size} endpoints`,
+      label: 'Contrato OpenAPI',
+      state: 'Cargado',
+    },
+    {
+      detail: `${catalog.name} - ${catalog.endpoints.length} endpoints`,
+      label: 'Coleccion Postman',
+      state: 'Sincronizada',
+    },
+  ];
 
   return (
     <div className={styles.page}>
@@ -95,7 +111,7 @@ export function HomePage({ onConnectionChange }: HomePageProps) {
 
         <div className={styles.heroStatus} aria-label="Resumen del entorno">
           <div className={styles.signal}>
-            <span className={styles.signalValue}>{hasConfiguredApi() ? 'Lista' : 'Pendiente'}</span>
+            <span className={styles.signalValue}>{connectionSettings.baseUrl.trim() ? 'Lista' : 'Pendiente'}</span>
             <span className={styles.signalLabel}>configuracion API</span>
           </div>
           <div className={styles.signal}>
@@ -103,8 +119,8 @@ export function HomePage({ onConnectionChange }: HomePageProps) {
             <span className={styles.signalLabel}>endpoints Postman</span>
           </div>
           <div className={styles.signal}>
-            <span className={styles.signalValue}>{Object.keys(apiDocument.paths).length}</span>
-            <span className={styles.signalLabel}>paths OpenAPI</span>
+            <span className={styles.signalValue}>{contractIndex.size}</span>
+            <span className={styles.signalLabel}>endpoints OpenAPI</span>
           </div>
         </div>
       </section>
@@ -114,7 +130,11 @@ export function HomePage({ onConnectionChange }: HomePageProps) {
         title="Health checks"
         description="Configura la API base URL, anade un Bearer token si lo necesitas y valida la disponibilidad del backend."
       >
-        <ConnectionHealthPanel initialBaseUrl={apiConfig.baseUrl} onConnectionChange={onConnectionChange} />
+        <ConnectionHealthPanel
+          connectionSettings={connectionSettings}
+          onConnectionChange={onConnectionChange}
+          onConnectionSettingsChange={updateConnectionSettings}
+        />
       </SectionCard>
 
       <SectionCard
@@ -182,7 +202,12 @@ export function HomePage({ onConnectionChange }: HomePageProps) {
       </SectionCard>
 
       <div id="endpoint-explorer">
-        <RagPymesApiDemo />
+        <RagPymesApiDemo
+          connectionSettings={connectionSettings}
+          onConnectionSettingsChange={updateConnectionSettings}
+          updateVariables={updateSharedVariables}
+          variables={sharedVariables}
+        />
       </div>
     </div>
   );

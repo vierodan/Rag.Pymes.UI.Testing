@@ -8,3 +8,10 @@ export interface ConnectionSummary {
   state: ConnectionState;
   status?: number | null;
 }
+
+export interface ApiConnectionSettings {
+  baseUrl: string;
+  bearerToken: string;
+}
+
+export type UpdateApiConnectionSettings = (updates: Partial<ApiConnectionSettings>) => void;
