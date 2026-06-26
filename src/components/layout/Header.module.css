@@ -70,6 +70,35 @@
   padding: 0.45rem 0.75rem;
 }
 
+.connection {
+  background: rgba(98, 114, 130, 0.1);
+  border: 1px solid rgba(98, 114, 130, 0.22);
+  border-radius: 8px;
+  color: var(--color-ink-soft);
+  font-size: 0.82rem;
+  font-weight: 850;
+  padding: 0.45rem 0.75rem;
+}
+
+.connection[data-state="checking"] {
+  background: rgba(34, 87, 122, 0.12);
+  border-color: rgba(34, 87, 122, 0.26);
+  color: var(--color-primary);
+}
+
+.connection[data-state="online"] {
+  background: rgba(31, 122, 77, 0.12);
+  border-color: rgba(31, 122, 77, 0.26);
+  color: var(--color-success);
+}
+
+.connection[data-state="offline"],
+.connection[data-state="invalid"] {
+  background: rgba(182, 58, 52, 0.12);
+  border-color: rgba(182, 58, 52, 0.28);
+  color: var(--color-danger);
+}
+
 .endpoint {
   font-family: var(--font-mono);
   font-size: 0.82rem;
