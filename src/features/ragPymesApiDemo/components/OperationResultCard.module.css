@@ -1,0 +1,152 @@
+.noticeBox,
+.resultCard {
+  border-radius: 8px;
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.9rem;
+}
+
+.noticeBox {
+  background: #ffffff;
+  border: 1px dashed var(--color-line);
+}
+
+.noticeBox strong,
+.resultCard strong {
+  color: var(--color-ink-strong);
+}
+
+.noticeBox p {
+  color: var(--color-ink-soft);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.resultCard {
+  background: #ffffff;
+  border: 1px solid var(--color-line);
+  color: #111827;
+}
+
+.resultCard[data-state="success"] {
+  background: #ecfdf3;
+  border-color: rgba(31, 122, 77, 0.34);
+}
+
+.resultCard[data-state="error"] {
+  background: #fff1f2;
+  border-color: rgba(182, 58, 52, 0.34);
+}
+
+.resultCard strong {
+  color: #111827;
+}
+
+.header {
+  align-items: start;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: flex-end;
+}
+
+.meta span {
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(17, 24, 39, 0.16);
+  border-radius: 999px;
+  color: #111827;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 850;
+  padding: 0.35rem 0.55rem;
+}
+
+.errorBox {
+  background: rgba(255, 255, 255, 0.54);
+  border: 1px solid rgba(127, 29, 29, 0.22);
+  border-radius: 8px;
+  color: #111827;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem;
+}
+
+.errorBox p {
+  color: #111827;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.payload {
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(17, 24, 39, 0.14);
+  border-radius: 8px;
+  color: #111827;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 0;
+  max-height: 22rem;
+  overflow: auto;
+  padding: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.jsonKey {
+  color: #65a30d;
+  font-style: italic;
+  font-weight: 700;
+}
+
+.jsonString {
+  color: #1d4ed8;
+  font-weight: 400;
+}
+
+.jsonNumber,
+.jsonBoolean {
+  color: #0f5132;
+  font-weight: 850;
+}
+
+.jsonNull {
+  color: #4b5563;
+  font-style: italic;
+  font-weight: 850;
+}
+
+.contextMenu {
+  background: #ffffff;
+  border: 1px solid rgba(17, 24, 39, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 18px 44px rgba(17, 24, 39, 0.18);
+  padding: 0.35rem;
+  position: fixed;
+  z-index: 1000;
+}
+
+.contextMenu button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #111827;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  min-width: 10rem;
+  padding: 0.65rem 0.8rem;
+  text-align: left;
+}
+
+.contextMenu button:hover,
+.contextMenu button:focus-visible {
+  background: rgba(101, 163, 13, 0.14);
+  outline: none;
+}
