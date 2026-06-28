@@ -6,6 +6,7 @@ import { SectionCard } from '../components/shared/SectionCard';
 import postmanCollection from '../data/postmanCollection.json';
 import { AccessManagementPanel } from '../features/ragPymesApiDemo/components/AccessManagementPanel';
 import { ConnectionHealthPanel } from '../features/ragPymesApiDemo/components/ConnectionHealthPanel';
+import { FeatureExplainerCards } from '../features/ragPymesApiDemo/components/FeatureExplainerCards';
 import { KnowledgePanel } from '../features/ragPymesApiDemo/components/KnowledgePanel';
 import { RagPymesApiDemo } from '../features/ragPymesApiDemo/components/RagPymesApiDemo';
 import { initialSharedDemoVariables, type SharedDemoVariables } from '../features/ragPymesApiDemo/types/demoVariables';
@@ -47,6 +48,57 @@ const workbenchSteps = [
   'Elegir un flujo guiado o abrir el explorador avanzado.',
   'Ejecutar request, revisar payload, estado HTTP y ProblemDetails.',
 ];
+
+const healthFeatureHelp = {
+  howTo: {
+    hint: 'Estas rutas no requieren autenticación y son la primera comprobación antes de ejecutar cualquier flujo con datos de negocio.',
+    steps: [
+      'Configura la API base URL del host RagPymes.Api, por ejemplo http://localhost:5088.',
+      'Ejecuta primero GET /health/live para confirmar que el proceso HTTP responde.',
+      'Ejecuta GET /health/ready para comprobar si dependencias y configuración crítica están listas.',
+      'Ejecuta GET /health para revisar el estado agregado del host y usarlo como smoke test rápido.',
+    ],
+  },
+  what: {
+    description: 'Valida que la SPA habla con el backend correcto y separa tres problemas distintos: proceso vivo, API preparada y estado agregado del host.',
+    fields: ['API base URL debe ser una URL absoluta http:// o https://.', 'No necesita body, parámetros ni Bearer token.', 'El token global puede configurarse aquí para reutilizarlo después en endpoints protegidos.'],
+    response: ['200 OK con estado de liveness, readiness o health agregado.', 'Latencia medida por la SPA para detectar lentitud básica.', 'ProblemDetails o error normalizado si la URL es inválida, el backend no responde o CORS bloquea la llamada.'],
+  },
+};
+
+const accessFeatureHelp = {
+  howTo: {
+    hint: 'AccessManagement es la frontera funcional de tenant y autorización: responde quién puede hacer qué, sobre qué tenant y sobre qué recurso.',
+    steps: [
+      'Configura un Bearer token válido o usa un entorno Development con autenticación desactivada de forma controlada.',
+      'Crea un tenant con registro self-service o provisioning técnico y captura tenantId.',
+      'Gestiona invitaciones, aceptación y memberships usando solo roles documentados.',
+      'Revisa siempre ProblemDetails, especialmente errorCode, cuando la API devuelva 400, 403, 409 o 429.',
+    ],
+  },
+  what: {
+    description: 'Permite probar la administración SaaS de RagPymes: alta de empresas, visibilidad de tenants, invitaciones por email, membresías humanas y cambios de rol.',
+    fields: ['tenantId, invitationId, invitationToken y membershipId son variables compartidas entre acciones.', 'Roles de tenant válidos: TenantOwner, TenantAdmin y TenantMember.', 'El actor humano se resuelve desde claims firmados; no se envían issuer, subject, actorId ni roles en requests self-service.'],
+    response: ['tenant y ownerMembership al registrar o provisionar.', 'invitations, invitationToken y membership al crear o aceptar invitaciones.', 'memberships con subjectId, role, status, fechas y version.', 'ProblemDetails con extensions.errorCode para validación, permisos, conflictos y cuotas.'],
+  },
+};
+
+const knowledgeFeatureHelp = {
+  howTo: {
+    hint: 'Knowledge depende de AccessManagement: el tenant debe estar activo y el actor necesita membership o grant válido para cada operación.',
+    steps: [
+      'Confirma tenantId y un actor autorizado con permisos Knowledge.Read o Knowledge.Write según la operación.',
+      'Crea o selecciona una knowledge base visible para el actor y captura knowledgeBaseId.',
+      'Sube un documento permitido y espera a que el Worker procese la ingestion antes de buscar o preguntar.',
+      'Ejecuta search o answer con preguntas no sensibles y revisa resultados, citas, metadata y abstenciones.',
+    ],
+  },
+  what: {
+    description: 'Valida el ciclo RAG documental: crear bases de conocimiento, subir documentos, procesarlos de forma asíncrona, buscar chunks relevantes y generar respuestas fundamentadas con citas.',
+    fields: ['tenantId está en todas las rutas públicas de Knowledge y no se infiere desde el usuario.', 'knowledgeBaseId, documentId e ingestionRunId deben pertenecer al tenant de la ruta.', 'filters es opcional, debe ser diccionario string-string y no puede incluir tenantId ni knowledgeBaseId.', 'Usa documentos sintéticos; no pegues contenido sensible, tokens ni prompts privados en logs o capturas.'],
+    response: ['knowledgeBase con tenantId, id, name, description, createdAt, isArchived y archivedAt.', 'document e ingestionRun con status, fechas, errorCode, errorMessage y modelo de embeddings cuando aplique.', 'results con documentId, chunkId, content, score y metadata.', 'answer con citations, model y metadata; puede abstenerse si la evidencia no es suficiente.'],
+  },
+};
 
 interface HomePageProps {
   onConnectionChange: (summary: ConnectionSummary) => void;
@@ -130,6 +182,7 @@ export function HomePage({ onConnectionChange }: HomePageProps) {
         title="Health checks"
         description="Configura la API base URL, anade un Bearer token si lo necesitas y valida la disponibilidad del backend."
       >
+        <FeatureExplainerCards ariaLabel="Como probar y que hace la feature de health checks" {...healthFeatureHelp} />
         <ConnectionHealthPanel
           connectionSettings={connectionSettings}
           onConnectionChange={onConnectionChange}
@@ -142,6 +195,7 @@ export function HomePage({ onConnectionChange }: HomePageProps) {
         title="Flujos guiados de tenants, invitaciones y membresias"
         description="Ejecuta operaciones frecuentes con formularios compactos, valores Postman y captura automatica de IDs reutilizables."
       >
+        <FeatureExplainerCards ariaLabel="Como probar y que hace la feature de Access Management" {...accessFeatureHelp} />
         <AccessManagementPanel updateVariables={updateSharedVariables} variables={sharedVariables} />
       </SectionCard>
 
@@ -150,6 +204,7 @@ export function HomePage({ onConnectionChange }: HomePageProps) {
         title="Flujos guiados RAG: bases, documentos, ingestion y retrieval"
         description="Crea knowledge bases, sube documentos con FormData real, sigue ingestion y ejecuta busquedas o respuestas con citas."
       >
+        <FeatureExplainerCards ariaLabel="Como probar y que hace la feature Knowledge" {...knowledgeFeatureHelp} />
         <KnowledgePanel updateVariables={updateSharedVariables} variables={sharedVariables} />
       </SectionCard>
 

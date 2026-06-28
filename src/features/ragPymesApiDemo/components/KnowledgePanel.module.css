@@ -18,7 +18,7 @@
   align-items: start;
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .variablesPanel h3,
@@ -49,13 +49,13 @@
 .formGrid {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .flowGrid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .flowPanel {
@@ -161,48 +161,16 @@
   overflow-wrap: anywhere;
 }
 
-.actionBlock button,
-.smallAction {
-  background: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  border-radius: 8px;
-  color: #ffffff;
-  cursor: pointer;
-  font-weight: 850;
-  min-height: 2.5rem;
-  overflow-wrap: anywhere;
-  padding: 0.65rem 0.9rem;
-  white-space: normal;
-  word-break: break-word;
-}
-
-.actionBlock button:disabled,
-.smallAction:disabled {
-  cursor: progress;
-  opacity: 0.72;
-}
-
 .buttonRow {
   align-items: start;
   display: grid;
   gap: 0.65rem;
-  grid-template-columns: repeat(auto-fit, minmax(10.75rem, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.smallAction {
-  align-content: center;
-  align-self: start;
-  display: grid;
-  gap: 0.2rem;
-  line-height: 1.2;
-  min-height: 3.75rem;
-  text-align: left;
-}
-
-.smallAction span {
-  color: rgba(255, 255, 255, 0.75);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
+.endpointStepAction {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .resultPanel {
@@ -253,7 +221,7 @@
 }
 
 .endpointLine {
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.28fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .errorBox {
@@ -313,7 +281,7 @@
 .resultCards {
   display: grid;
   gap: 0.65rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   margin-top: 0.6rem;
 }
 

@@ -1,0 +1,91 @@
+.wrap {
+  display: inline-flex;
+  justify-self: start;
+  position: relative;
+}
+
+.button {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 850;
+  justify-content: center;
+  line-height: 1.35;
+  min-height: 2.75rem;
+  min-width: 9.5rem;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.getButton {
+  background: var(--color-primary);
+  box-shadow: 0 12px 24px rgba(31, 74, 122, 0.18);
+}
+
+.postButton {
+  background: var(--color-accent);
+  box-shadow: 0 12px 24px rgba(242, 140, 82, 0.2);
+}
+
+.patchButton {
+  background: var(--color-accent-strong);
+  box-shadow: 0 12px 24px rgba(184, 94, 44, 0.2);
+}
+
+.deleteButton {
+  background: var(--color-danger);
+  box-shadow: 0 12px 24px rgba(182, 58, 52, 0.2);
+}
+
+.button:hover {
+  transform: translateY(-1px);
+}
+
+.button:disabled {
+  box-shadow: none;
+  cursor: progress;
+  opacity: 0.66;
+  transform: none;
+}
+
+.tooltip {
+  background: #ffffff;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  bottom: calc(100% + 0.55rem);
+  box-shadow: 0 18px 40px rgba(28, 49, 68, 0.16);
+  color: var(--color-ink-strong);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 800;
+  left: 0;
+  line-height: 1.35;
+  max-width: min(82vw, 54rem);
+  min-width: max-content;
+  opacity: 0;
+  overflow: auto;
+  padding: 0.65rem 0.8rem;
+  pointer-events: none;
+  position: absolute;
+  transform: translateY(0.2rem);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    visibility 140ms ease;
+  visibility: hidden;
+  white-space: nowrap;
+  z-index: 20;
+}
+
+.wrap:hover .tooltip,
+.wrap:focus-within .tooltip {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}

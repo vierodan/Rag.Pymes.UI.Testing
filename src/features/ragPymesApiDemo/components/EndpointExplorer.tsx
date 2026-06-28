@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import apiDefinition from '../../../../api-definition/RagPymes-v1.json';
+import { ApiHttpError } from '../../../api/apiError';
 import { httpClient } from '../../../api/httpClient';
 import postmanCollection from '../../../data/postmanCollection.json';
 import { buildOpenApiContractIndex } from '../../../lib/openapi';
@@ -9,20 +10,13 @@ import type { ApiConnectionSettings, UpdateApiConnectionSettings } from '../../.
 import type { OpenApiDocument, OperationContract } from '../../../types/openapi';
 import type { ApiEndpoint, EndpointField } from '../../../types/postman';
 import type { SharedDemoVariables, UpdateSharedDemoVariables } from '../types/demoVariables';
-import { formatPayload, normalizeApiError } from './apiResultUtils';
+import { normalizeApiError } from './apiResultUtils';
+import { ApiActionButton } from './ApiActionButton';
+import { EndpointStepTitle } from './EndpointStepTitle';
+import { OperationResultCard, type OperationResult } from './OperationResultCard';
 import styles from './EndpointExplorer.module.css';
 
 type TokenMode = 'required' | 'always' | 'never';
-
-interface ApiResponse {
-  body: string;
-  durationMs: number;
-  headers: Array<[string, string]>;
-  ok: boolean;
-  requestUrl: string;
-  status: number;
-  statusText: string;
-}
 
 interface EndpointExplorerProps {
   connectionSettings: ApiConnectionSettings;
@@ -96,8 +90,7 @@ export function EndpointExplorer({
   const [methodFilter, setMethodFilter] = useState('ALL');
   const [selectedId, setSelectedId] = useState(catalog.endpoints[0]?.id ?? '');
   const [isSending, setIsSending] = useState(false);
-  const [response, setResponse] = useState<ApiResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [resultsByEndpoint, setResultsByEndpoint] = useState<Record<string, OperationResult | undefined>>({});
 
   const requestVariables = useMemo<Record<string, string>>(
     () => buildRequestVariables(localVariables, sharedVariables),
@@ -169,12 +162,10 @@ export function EndpointExplorer({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSending(true);
-    setError(null);
-    setResponse(null);
+    const startedAt = performance.now();
 
     try {
       const request = buildRequest(selectedEndpoint);
-      const startedAt = performance.now();
       const result = await httpClient.execute(selectedEndpoint.method, request.path, {
         auth: request.auth,
         body: request.body,
@@ -182,21 +173,41 @@ export function EndpointExplorer({
         query: request.query,
       });
 
-      setResponse({
-        body: formatResponseBody(result.payload),
-        durationMs: Math.round(performance.now() - startedAt),
-        headers: result.headers,
-        ok: result.ok,
-        requestUrl: result.requestUrl,
-        status: result.status,
-        statusText: result.statusText,
-      });
+      setResultsByEndpoint((current) => ({
+        ...current,
+        [selectedEndpoint.id]: {
+          error: result.ok
+            ? undefined
+            : normalizeApiError(
+                new ApiHttpError(result.status, result.statusText, result.payload),
+                'La API ha devuelto una respuesta HTTP de error.',
+              ),
+          latencyMs: Math.round(performance.now() - startedAt),
+          payload: {
+            body: result.payload ?? null,
+            headers: Object.fromEntries(result.headers),
+            requestUrl: result.requestUrl,
+            statusText: result.statusText,
+          },
+          status: result.status,
+          state: result.ok ? 'success' : 'error',
+        },
+      }));
     } catch (requestError) {
       const normalizedError = normalizeApiError(
         requestError,
         'Comprueba base URL, CORS, token Bearer y variables de path/query.',
       );
-      setError(`${normalizedError.name}: ${normalizedError.message}`);
+      setResultsByEndpoint((current) => ({
+        ...current,
+        [selectedEndpoint.id]: {
+          error: normalizedError,
+          latencyMs: Math.round(performance.now() - startedAt),
+          payload: normalizedError.problem,
+          status: normalizedError.status ?? null,
+          state: 'error',
+        },
+      }));
     } finally {
       setIsSending(false);
     }
@@ -292,10 +303,11 @@ export function EndpointExplorer({
         </label>
         <label>
           Bearer token global
-          <input
-            type="password"
+          <textarea
+            className={styles.tokenTextarea}
             value={connectionSettings.bearerToken}
-            placeholder="Paste access token"
+            placeholder="Pega aquí el token Bearer"
+            rows={6}
             onChange={(event) => onConnectionSettingsChange({ bearerToken: event.target.value })}
           />
         </label>
@@ -360,14 +372,12 @@ export function EndpointExplorer({
           <section className={cx('endpoint-heading')}>
             <div>
               <p>{selectedEndpoint.group.join(' / ')}</p>
-              <h2>{selectedEndpoint.name}</h2>
+              <EndpointStepTitle path={selectedEndpoint.path} title={selectedEndpoint.name} />
             </div>
             <span className={cx('method', `method-${selectedEndpoint.method.toLowerCase()}`)}>
               {selectedEndpoint.method}
             </span>
           </section>
-
-          <code className={cx('path-preview')}>{selectedEndpoint.path}</code>
 
           <section className={styles.description} aria-label="Postman description">
             <div className={cx('section-title')}>Postman description</div>
@@ -460,35 +470,29 @@ export function EndpointExplorer({
           )}
 
           <div className={styles.actions}>
-            <button disabled={isSending} type="submit">
-              {isSending ? 'Sending...' : 'Send request'}
-            </button>
-            <span>{selectedEndpoint.requiresAuth ? 'Auth expected' : 'No auth expected'}</span>
+            <ApiActionButton
+              disabled={isSending}
+              method={selectedEndpoint.method}
+              path={selectedEndpoint.path}
+              type="submit"
+            />
+            <span>{selectedEndpoint.requiresAuth ? 'Requiere autenticación' : 'No requiere autenticación'}</span>
           </div>
-        </form>
 
-        <aside className={cx('response-panel')} aria-label="Response">
-          <h2>Response</h2>
-          {error && <pre className={cx('error-output')}>{error}</pre>}
-          {response ? (
-            <>
-              <div className={cx('status', response.ok ? 'ok' : 'fail')}>
-                <strong>
-                  {response.status} {response.statusText}
-                </strong>
-                <span>{response.durationMs} ms</span>
-              </div>
-              <code className={cx('request-url')}>{response.requestUrl}</code>
-              <details>
-                <summary>Response headers</summary>
-                <pre>{response.headers.map(([key, value]) => `${key}: ${value}`).join('\n')}</pre>
-              </details>
-              <pre className={cx('response-body')}>{response.body}</pre>
-            </>
-          ) : (
-            <p className={cx('empty-state')}>Send a request to inspect status, headers, and body.</p>
-          )}
-        </aside>
+          <OperationResultCard
+            idleMessage="Ejecuta este endpoint para inspeccionar el estado HTTP, la URL resuelta, las cabeceras y el cuerpo devuelto por la API."
+            onClearResult={
+              resultsByEndpoint[selectedEndpoint.id]
+                ? () =>
+                    setResultsByEndpoint((current) => ({
+                      ...current,
+                      [selectedEndpoint.id]: undefined,
+                    }))
+                : undefined
+            }
+            result={resultsByEndpoint[selectedEndpoint.id]}
+          />
+        </form>
       </div>
     </div>
   );
@@ -558,16 +562,4 @@ function formatDescription(description: string) {
         .trim(),
     )
     .filter(Boolean);
-}
-
-function formatResponseBody(payload: unknown) {
-  if (payload === null || payload === undefined || payload === '') {
-    return '(empty response)';
-  }
-
-  if (typeof payload === 'string') {
-    return payload;
-  }
-
-  return formatPayload(payload, '(empty response)');
 }

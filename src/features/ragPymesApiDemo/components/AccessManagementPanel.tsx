@@ -7,7 +7,11 @@ import type {
   RegisterTenantRequest,
 } from '../../../api/contracts';
 import type { SharedDemoVariables, UpdateSharedDemoVariables } from '../types/demoVariables';
-import { formatPayload, normalizeApiError, type NormalizedApiError } from './apiResultUtils';
+import { normalizeApiError, type NormalizedApiError } from './apiResultUtils';
+import { ApiActionButton } from './ApiActionButton';
+import { EndpointStepTitle } from './EndpointStepTitle';
+import { FeatureExplainerCards, type FeatureExplainerCardsProps } from './FeatureExplainerCards';
+import { OperationResultCard } from './OperationResultCard';
 import styles from './AccessManagementPanel.module.css';
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
@@ -23,7 +27,6 @@ interface ActionResult {
   captured: Partial<SharedDemoVariables>;
   error?: NormalizedApiError;
   latencyMs: number;
-  meta: ActionMeta;
   payload?: unknown;
   status: number | null;
   state: 'success' | 'error';
@@ -110,6 +113,77 @@ const initialMembershipForm = {
   role: 'TenantAdmin' as TenantRole,
 };
 
+const accessSectionHelp = {
+  tenantOnboarding: {
+    ariaLabel: 'Como probar y que hace Tenant onboarding',
+    howTo: {
+      hint: 'Son dos caminos distintos: RegisterTenant es alta self-service de empresa; ProvisionTenant es alta técnica/backoffice con identidad de provisioning.',
+      steps: [
+        'Para RegisterTenant, usa un Bearer token de usuario: el owner se resuelve desde claims firmados del token.',
+        'Rellena companyName; slug y contactEmail son opcionales en contrato, aunque la UI los deja editables.',
+        'Para ProvisionTenant, usa la identidad técnica configurada en AccessManagement:Provisioner:Issuer y Subject.',
+        'Ejecuta la acción y confirma que la respuesta incluye tenant y ownerMembership con rol TenantOwner.',
+      ],
+    },
+    what: {
+      description: 'Crea un tenant activo y su primera membresía owner. Es el punto de entrada para cualquier prueba posterior de invitaciones, memberships o Knowledge.',
+      fields: ['RegisterTenant: companyName obligatorio, máximo 160 caracteres; slug opcional, único, en minúsculas, 3-80 caracteres, solo letras, números y guiones, sin guiones iniciales/finales ni consecutivos.', 'RegisterTenant no acepta issuer, externalSubject, actorId ni roles en el body: el actor autenticado sale exclusivamente del token.', 'ProvisionTenant: name, ownerIssuer y ownerExternalSubject obligatorios; solo puede ejecutarlo la identidad técnica configurada.', 'Ambos flujos crean el tenant en estado Active y una TenantMembership activa con rol TenantOwner.'],
+      response: ['201 Created con tenant: id, name, slug, status, createdAt, suspendedAt y version.', 'ownerMembership: id, tenantId, subjectId, role, status, fechas y version.', 'Location hacia /api/v1/tenants/{tenantId}.', 'ProblemDetails con 400 por validación, 401/403 por autenticación/autorización, 409 por conflicto de slug y 429 por cuota de registro.'],
+    },
+  },
+  tenantAdministration: {
+    ariaLabel: 'Como probar y que hace Tenant administration',
+    howTo: {
+      hint: 'Estas acciones usan el plano administrativo de tenants; no equivalen al selector de tenants del usuario /api/v1/me/tenants.',
+      steps: [
+        'Usa un token con permisos de plataforma o la configuración de desarrollo que permita probar este plano.',
+        'Ejecuta ListTenants para obtener tenants administrables y capturar tenantId si la respuesta trae alguno.',
+        'Ejecuta GetTenant con el tenantId compartido para validar detalle administrativo.',
+        'Si necesitas la lista de tenants visibles para el usuario autenticado, usa /api/v1/me/tenants desde el explorador avanzado.',
+      ],
+    },
+    what: {
+      description: 'Permite comprobar el plano administrativo de tenants: listado global y lectura de detalle por id.',
+      fields: ['ListTenants ejecuta GET /api/v1/tenants y no tiene body.', 'GetTenant ejecuta GET /api/v1/tenants/{tenantId}; tenantId no puede ser Guid.Empty.', 'Estas rutas requieren permisos de plataforma según la API pública de AccessManagement.'],
+      response: ['ListTenants devuelve tenants con id, name, slug, status, createdAt, suspendedAt y version.', 'GetTenant devuelve un objeto tenant con el mismo contrato.', '404 si el tenant no existe o no es accesible; 401/403 si falta autenticación o permiso de plataforma.'],
+    },
+  },
+  invitations: {
+    ariaLabel: 'Como probar y que hace Invitations',
+    howTo: {
+      hint: 'La creación de memberships humanas debe pasar por invitación y aceptación autenticada; el endpoint legacy de creación directa no forma parte de la API SaaS pública.',
+      steps: [
+        'Confirma que tenantId pertenece a un tenant activo y que el actor puede administrar invitaciones.',
+        'Crea una invitación con email y role usando TenantOwner, TenantAdmin o TenantMember.',
+        'Guarda el invitationToken devuelto: es sensible y se usa en POST /api/v1/invitations/{token}/accept.',
+        'Lista invitaciones para auditar estado o revoca usando tenantId e invitationId.',
+      ],
+    },
+    what: {
+      description: 'Gestiona la incorporación de usuarios humanos a un tenant mediante invitaciones por email y aceptación con el usuario autenticado.',
+      fields: ['Create invitation: email y role son obligatorios; role debe ser TenantOwner, TenantAdmin o TenantMember.', 'TenantOwner puede invitar cualquier rol; TenantAdmin puede invitar TenantAdmin o TenantMember, pero no TenantOwner.', 'Accept invitation usa token en ruta y no tiene body; el actor se resuelve desde su propio Bearer token.', 'Revoke invitation usa tenantId e invitationId y no elimina memberships ya activadas.'],
+      response: ['201 Created con invitation en estado Pending, expiresAt, version e invitationToken.', 'Accept devuelve invitation y membership activada o creada.', 'Revoke devuelve invitation en estado revocado.', '403 si el email del actor no coincide al aceptar; 404 si el token no existe; 409 si ya fue aceptada o revocada.'],
+    },
+  },
+  memberships: {
+    ariaLabel: 'Como probar y que hace Memberships',
+    howTo: {
+      hint: 'El último TenantOwner activo está protegido: no puede perder el rol owner ni ser revocado si deja el tenant sin propietario.',
+      steps: [
+        'Lista memberships del tenant para elegir un membershipId válido.',
+        'Selecciona el nuevo rol antes de ejecutar ChangeTenantMembershipRole.',
+        'Ejecuta revoke solo en entornos no productivos y revisa el resultado 204 No Content.',
+        'Si recibes 409, comprueba si estás intentando modificar o revocar el último TenantOwner activo.',
+      ],
+    },
+    what: {
+      description: 'Administra la relación entre un usuario humano y un tenant: listado de membresías, cambio de rol y cierre de acceso.',
+      fields: ['tenantId y membershipId no pueden ser Guid.Empty.', 'role es obligatorio y acepta TenantOwner, TenantAdmin o TenantMember.', 'TenantAdmin no puede modificar owners ni asignar TenantOwner.', 'Una membership contiene subjectId, role, status, createdAt, activatedAt, suspendedAt, revokedAt y version.'],
+      response: ['List memberships devuelve memberships del tenant.', 'Change role devuelve membership actualizada con version incrementada.', 'Revoke devuelve 204 No Content; si la membership ya estaba revocada, la operación es idempotente.', '403 por falta de privilegios; 409 por conflicto de estado o protección del último owner.'],
+    },
+  },
+} satisfies Record<string, FeatureExplainerCardsProps>;
+
 interface AccessManagementPanelProps {
   updateVariables: UpdateSharedDemoVariables;
   variables: SharedDemoVariables;
@@ -121,7 +195,7 @@ export function AccessManagementPanel({ updateVariables, variables }: AccessMana
   const [invitationForm, setInvitationForm] = useState(initialInvitationForm);
   const [membershipForm, setMembershipForm] = useState(initialMembershipForm);
   const [activeOperationId, setActiveOperationId] = useState<string | null>(null);
-  const [result, setResult] = useState<ActionResult | null>(null);
+  const [results, setResults] = useState<Record<string, ActionResult>>({});
 
   async function runAction(meta: ActionMeta, action: () => Promise<unknown>) {
     setActiveOperationId(meta.operationId);
@@ -137,32 +211,43 @@ export function AccessManagementPanel({ updateVariables, variables }: AccessMana
         updateVariables(captured);
       }
 
-      setResult({
+      setResults((current) => ({
+        ...current,
+        [meta.operationId]: {
         captured,
         latencyMs,
-        meta,
         payload,
         status,
         state: 'success',
-      });
+        },
+      }));
     } catch (error) {
       const normalizedError = normalizeApiError(
         error,
         'Comprueba la base URL, el token Bearer y los permisos del actor autenticado.',
       );
 
-      setResult({
+      setResults((current) => ({
+        ...current,
+        [meta.operationId]: {
         captured: {},
         error: normalizedError,
         latencyMs: Math.round(performance.now() - startedAt),
-        meta,
         payload: normalizedError.problem,
         status: normalizedError.status ?? null,
         state: 'error',
-      });
+        },
+      }));
     } finally {
       setActiveOperationId(null);
     }
+  }
+
+  function clearResult(operationId: string) {
+    setResults((current) => {
+      const { [operationId]: _removed, ...remaining } = current;
+      return remaining;
+    });
   }
 
   return (
@@ -197,17 +282,19 @@ export function AccessManagementPanel({ updateVariables, variables }: AccessMana
       </section>
 
       <div className={styles.flowGrid}>
-        <FlowPanel title="Tenant onboarding">
+        <FlowPanel help={accessSectionHelp.tenantOnboarding} title="Tenant onboarding">
           <ActionBlock
             activeOperationId={activeOperationId}
             description="Self-service. El actor sale del token; no envies issuer, subject ni roles."
             meta={actions.registerTenant}
+            onClearResult={clearResult}
             onRun={() =>
               runAction(actions.registerTenant, () =>
                 ragPymesApi.accessManagement.registerTenant(toRegisterTenantRequest(registerForm)),
               )
             }
             title="Register tenant"
+            result={results[actions.registerTenant.operationId]}
           >
             <div className={styles.formGrid}>
               <TextField
@@ -232,12 +319,14 @@ export function AccessManagementPanel({ updateVariables, variables }: AccessMana
             activeOperationId={activeOperationId}
             description="Provisioning tecnico atomico de tenant y primer owner."
             meta={actions.provisionTenant}
+            onClearResult={clearResult}
             onRun={() =>
               runAction(actions.provisionTenant, () =>
                 ragPymesApi.accessManagement.provisionTenant(toProvisionTenantRequest(provisionForm)),
               )
             }
             title="Provision tenant"
+            result={results[actions.provisionTenant.operationId]}
           >
             <div className={styles.formGrid}>
               <TextField
@@ -259,30 +348,35 @@ export function AccessManagementPanel({ updateVariables, variables }: AccessMana
           </ActionBlock>
         </FlowPanel>
 
-        <FlowPanel title="Tenant administration">
+        <FlowPanel help={accessSectionHelp.tenantAdministration} title="Tenant administration">
           <ActionBlock
             activeOperationId={activeOperationId}
             description="Listado administrativo. Captura el primer tenant devuelto si existe."
             meta={actions.listTenants}
+            onClearResult={clearResult}
             onRun={() => runAction(actions.listTenants, () => ragPymesApi.accessManagement.listTenants())}
+            result={results[actions.listTenants.operationId]}
             title="List tenants"
           />
           <ActionBlock
             activeOperationId={activeOperationId}
             description="Usa tenantId compartido para consultar detalle administrativo."
             meta={actions.getTenant}
+            onClearResult={clearResult}
             onRun={() => runAction(actions.getTenant, () => ragPymesApi.accessManagement.getTenant(variables.tenantId))}
+            result={results[actions.getTenant.operationId]}
             title="Get tenant"
           >
             <VariableHint label="tenantId" value={variables.tenantId} />
           </ActionBlock>
         </FlowPanel>
 
-        <FlowPanel title="Invitations">
+        <FlowPanel help={accessSectionHelp.invitations} title="Invitations">
           <ActionBlock
             activeOperationId={activeOperationId}
             description="Roles documentados: TenantOwner, TenantAdmin, TenantMember."
             meta={actions.createTenantInvitation}
+            onClearResult={clearResult}
             onRun={() =>
               runAction(actions.createTenantInvitation, () =>
                 ragPymesApi.accessManagement.createTenantInvitation(
@@ -292,6 +386,7 @@ export function AccessManagementPanel({ updateVariables, variables }: AccessMana
               )
             }
             title="Create invitation"
+            result={results[actions.createTenantInvitation.operationId]}
           >
             <div className={styles.formGrid}>
               <VariableHint label="tenantId" value={variables.tenantId} />
@@ -309,37 +404,49 @@ export function AccessManagementPanel({ updateVariables, variables }: AccessMana
           </ActionBlock>
 
           <div className={styles.buttonRow}>
-            <SmallActionButton
+            <ActionBlock
               activeOperationId={activeOperationId}
+              description="Lista las invitaciones del tenant para auditar estado, expiracion, aceptacion o revocacion."
               meta={actions.listTenantInvitations}
+              onClearResult={clearResult}
               onRun={() =>
                 runAction(actions.listTenantInvitations, () =>
                   ragPymesApi.accessManagement.listTenantInvitations(variables.tenantId),
                 )
               }
+              result={results[actions.listTenantInvitations.operationId]}
+              title="List invitations"
             />
-            <SmallActionButton
+            <ActionBlock
               activeOperationId={activeOperationId}
+              description="Acepta una invitacion con el token capturado y el usuario autenticado actual."
               meta={actions.acceptTenantInvitation}
+              onClearResult={clearResult}
               onRun={() =>
                 runAction(actions.acceptTenantInvitation, () =>
                   ragPymesApi.accessManagement.acceptTenantInvitation(variables.invitationToken),
                 )
               }
+              result={results[actions.acceptTenantInvitation.operationId]}
+              title="Accept invitation"
             />
-            <SmallActionButton
+            <ActionBlock
               activeOperationId={activeOperationId}
+              description="Revoca una invitacion usando tenantId e invitationId compartidos."
               meta={actions.revokeTenantInvitation}
+              onClearResult={clearResult}
               onRun={() =>
                 runAction(actions.revokeTenantInvitation, () =>
                   ragPymesApi.accessManagement.revokeTenantInvitation(variables.tenantId, variables.invitationId),
                 )
               }
+              result={results[actions.revokeTenantInvitation.operationId]}
+              title="Revoke invitation"
             />
           </div>
         </FlowPanel>
 
-        <FlowPanel title="Memberships">
+        <FlowPanel help={accessSectionHelp.memberships} title="Memberships">
           <div className={styles.formGrid}>
             <VariableHint label="tenantId" value={variables.tenantId} />
             <VariableHint label="membershipId" value={variables.membershipId} />
@@ -350,18 +457,24 @@ export function AccessManagementPanel({ updateVariables, variables }: AccessMana
             />
           </div>
           <div className={styles.buttonRow}>
-            <SmallActionButton
+            <ActionBlock
               activeOperationId={activeOperationId}
+              description="Lista todas las memberships del tenant con subjectId, role, status y version."
               meta={actions.listTenantMemberships}
+              onClearResult={clearResult}
               onRun={() =>
                 runAction(actions.listTenantMemberships, () =>
                   ragPymesApi.accessManagement.listTenantMemberships(variables.tenantId),
                 )
               }
+              result={results[actions.listTenantMemberships.operationId]}
+              title="List memberships"
             />
-            <SmallActionButton
+            <ActionBlock
               activeOperationId={activeOperationId}
+              description="Cambia el rol de una membership respetando permisos y proteccion del ultimo owner."
               meta={actions.changeTenantMembershipRole}
+              onClearResult={clearResult}
               onRun={() =>
                 runAction(actions.changeTenantMembershipRole, () =>
                   ragPymesApi.accessManagement.changeTenantMembershipRole(variables.tenantId, variables.membershipId, {
@@ -369,72 +482,40 @@ export function AccessManagementPanel({ updateVariables, variables }: AccessMana
                   }),
                 )
               }
+              result={results[actions.changeTenantMembershipRole.operationId]}
+              title="Change membership role"
             />
-            <SmallActionButton
+            <ActionBlock
               activeOperationId={activeOperationId}
+              description="Revoca la membership indicada; devuelve 204 No Content cuando se completa."
               meta={actions.revokeTenantMembership}
+              onClearResult={clearResult}
               onRun={() =>
                 runAction(actions.revokeTenantMembership, () =>
                   ragPymesApi.accessManagement.revokeTenantMembership(variables.tenantId, variables.membershipId),
                 )
               }
+              result={results[actions.revokeTenantMembership.operationId]}
+              title="Revoke membership"
             />
           </div>
         </FlowPanel>
       </div>
-
-      <section className={styles.resultPanel} data-state={result?.state ?? 'idle'}>
-        <div className={styles.resultHeader}>
-          <div>
-            <p className={styles.eyebrow}>Resultado</p>
-            <h3>{result ? result.meta.operationId : 'Sin ejecutar'}</h3>
-          </div>
-          <div className={styles.resultMeta}>
-            <span>{result?.meta.method ?? '-'}</span>
-            <span>HTTP {result?.status ?? '-'}</span>
-            <span>{result ? `${result.latencyMs} ms` : '- ms'}</span>
-          </div>
-        </div>
-
-        {result ? (
-          <div className={styles.endpointLine}>
-            <span>{result.meta.endpoint}</span>
-            <span>{result.meta.operationId}</span>
-          </div>
-        ) : null}
-
-        {result?.error ? (
-          <div className={styles.errorBox}>
-            <strong>{result.error.name}</strong>
-            <p>{result.error.message}</p>
-            {result.error.detail ? <p>{result.error.detail}</p> : null}
-          </div>
-        ) : null}
-
-        {result && Object.keys(result.captured).length > 0 ? (
-          <div className={styles.capturedBox}>
-            <strong>Variables actualizadas</strong>
-            <span>{Object.entries(result.captured).map(([key, value]) => `${key}: ${value}`).join(' | ')}</span>
-          </div>
-        ) : null}
-
-        <pre className={styles.payload}>
-          {formatPayload(result?.error?.problem ?? result?.payload, 'Ejecuta una accion para ver payload o error.')}
-        </pre>
-      </section>
     </div>
   );
 }
 
 interface FlowPanelProps {
   children: ReactNode;
+  help: FeatureExplainerCardsProps;
   title: string;
 }
 
-function FlowPanel({ children, title }: FlowPanelProps) {
+function FlowPanel({ children, help, title }: FlowPanelProps) {
   return (
     <section className={styles.flowPanel}>
       <h3>{title}</h3>
+      <FeatureExplainerCards {...help} />
       {children}
     </section>
   );
@@ -445,34 +526,48 @@ interface ActionBlockProps {
   children?: ReactNode;
   description: string;
   meta: ActionMeta;
+  onClearResult: (operationId: string) => void;
   onRun: () => void;
+  result?: ActionResult;
   title: string;
 }
 
-function ActionBlock({ activeOperationId, children, description, meta, onRun, title }: ActionBlockProps) {
+function ActionBlock({
+  activeOperationId,
+  children,
+  description,
+  meta,
+  onClearResult,
+  onRun,
+  result,
+  title,
+}: ActionBlockProps) {
+  const capturedExtra =
+    result && Object.keys(result.captured).length > 0 ? (
+      <div className={styles.capturedBox}>
+        <strong>Variables actualizadas</strong>
+        <span>{Object.entries(result.captured).map(([key, value]) => `${key}: ${value}`).join(' | ')}</span>
+      </div>
+    ) : undefined;
+
   return (
     <article className={styles.actionBlock}>
       <ActionHeader description={description} meta={meta} title={title} />
       {children}
-      <button disabled={activeOperationId !== null} onClick={onRun} type="button">
-        {activeOperationId === meta.operationId ? 'Ejecutando...' : `Ejecutar ${meta.operationId}`}
-      </button>
+      <div className={styles.endpointStepAction}>
+        <ApiActionButton
+          disabled={activeOperationId !== null}
+          method={meta.method}
+          onClick={onRun}
+          path={meta.endpoint}
+        />
+      </div>
+      <OperationResultCard
+        idleMessage={`Ejecuta ${meta.operationId} para ver el resultado de esta operacion.`}
+        onClearResult={result ? () => onClearResult(meta.operationId) : undefined}
+        result={result ? { ...result, extra: capturedExtra } : undefined}
+      />
     </article>
-  );
-}
-
-interface SmallActionButtonProps {
-  activeOperationId: string | null;
-  meta: ActionMeta;
-  onRun: () => void;
-}
-
-function SmallActionButton({ activeOperationId, meta, onRun }: SmallActionButtonProps) {
-  return (
-    <button className={styles.smallAction} disabled={activeOperationId !== null} onClick={onRun} type="button">
-      <span>{meta.method}</span>
-      {activeOperationId === meta.operationId ? 'Ejecutando...' : meta.operationId}
-    </button>
   );
 }
 
@@ -486,23 +581,9 @@ function ActionHeader({ description, meta, title }: ActionHeaderProps) {
   return (
     <div className={styles.actionHeader}>
       <div>
-        <h4>{title}</h4>
+        <EndpointStepTitle path={meta.endpoint} title={title} />
         <p>{description}</p>
       </div>
-      <dl>
-        <div>
-          <dt>method</dt>
-          <dd>{meta.method}</dd>
-        </div>
-        <div>
-          <dt>endpoint</dt>
-          <dd>{meta.endpoint}</dd>
-        </div>
-        <div>
-          <dt>operationId</dt>
-          <dd>{meta.operationId}</dd>
-        </div>
-      </dl>
     </div>
   );
 }
